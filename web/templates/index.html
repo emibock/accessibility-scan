@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accessibility Scanner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Accessibility Scanner</h1>
+            <p>WCAG 2.1 violations exported to CSV, JSON, and Markdown</p>
+        </header>
+
+        <main>
+            <form id="scanForm">
+                <section class="form-section">
+                    <h2>Target Website</h2>
+
+                    <div class="form-group">
+                        <label for="start_url">Start URL *</label>
+                        <input type="url" id="start_url" name="start_url" required
+                               placeholder="https://example.com">
+                        <small>Homepage or main entry point</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="crawl" id="crawl">
+                            Crawl to discover pages (uncheck to scan single page)
+                        </label>
+                    </div>
+
+                    <div class="form-group" id="maxPagesGroup" style="display:none;">
+                        <label for="max_pages">Max Pages to Scan</label>
+                        <input type="number" id="max_pages" name="max_pages" value="50" min="1" max="500">
+                    </div>
+                </section>
+
+                <section class="form-section">
+                    <h2>Authentication (Optional)</h2>
+
+                    <div class="form-group">
+                        <label for="login_url">Login URL</label>
+                        <input type="url" id="login_url" name="login_url"
+                               placeholder="https://example.com/login">
+                        <small>Leave blank if no authentication needed</small>
+                    </div>
+
+                    <div id="authFields" style="display:none;">
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input type="text" id="username" name="username">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" name="password">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="success_indicator">Success Indicator (CSS selector)</label>
+                            <input type="text" id="success_indicator" name="success_indicator"
+                                   placeholder=".user-menu">
+                            <small>Element visible after successful login</small>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Start Scan</button>
+                </div>
+            </form>
+        </main>
+    </div>
+
+    <script>
+        // Show/hide fields based on selections
+        document.getElementById('crawl').addEventListener('change', (e) => {
+            document.getElementById('maxPagesGroup').style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        document.getElementById('login_url').addEventListener('input', (e) => {
+            document.getElementById('authFields').style.display = e.target.value ? 'block' : 'none';
+        });
+
+        // Form submission
+        document.getElementById('scanForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const response = await fetch('/start-scan', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            window.location.href = `/results/${data.scan_id}`;
+        });
+    </script>
+</body>
+</html>

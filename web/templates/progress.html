@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Progress</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Scan in Progress</h1>
+        </header>
+
+        <main>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                </div>
+                <p class="progress-text" id="progress-text">Starting scan...</p>
+                <p class="progress-percentage" id="progress-percentage">0%</p>
+            </div>
+
+            <div class="spinner"></div>
+        </main>
+    </div>
+
+    <script>
+        const scanId = "{{ scan_id }}";
+
+        function updateProgress() {
+            fetch(`/api/status/${scanId}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('progress-fill').style.width = data.progress + '%';
+                    document.getElementById('progress-text').textContent = data.message;
+                    document.getElementById('progress-percentage').textContent = data.progress + '%';
+
+                    if (data.status === 'complete') {
+                        window.location.reload();
+                    } else if (data.status === 'failed') {
+                        document.getElementById('progress-text').innerHTML =
+                            `<span style="color: #c30000;">Error: ${data.error}</span>`;
+                        document.querySelector('.spinner').style.display = 'none';
+                    } else {
+                        setTimeout(updateProgress, 1000);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    setTimeout(updateProgress, 2000);
+                });
+        }
+
+        updateProgress();
+    </script>
+</body>
+</html>

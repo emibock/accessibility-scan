@@ -1,0 +1,24 @@
+# Example configuration for accessibility scanner
+
+# Target website
+start_url: https://example.com
+max_pages: 50
+
+# Authentication (optional - remove if not needed)
+authentication:
+  login_url: https://example.com/login
+
+  # Use environment variables for credentials
+  username: ${ENV:USERNAME}
+  password: ${ENV:PASSWORD}
+
+  # CSS selectors for login form
+  username_selector: input[name='username']
+  password_selector: input[name='password']
+  submit_selector: button[type='submit']
+
+  # Element visible after successful login
+  success_indicator: .user-menu
+
+# Browser settings
+headless: true

@@ -1,0 +1,474 @@
+/* ACR Tool Web UI Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Skip link for keyboard navigation */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: #000;
+    color: #fff;
+    padding: 8px 16px;
+    text-decoration: none;
+    z-index: 1000;
+    font-weight: bold;
+    border-radius: 0 0 4px 0;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: #f5f5f5;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 2rem 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+header p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+}
+
+main {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.form-section {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+.form-section:last-child {
+    border-bottom: none;
+}
+
+.form-section h2 {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    color: #667eea;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #444;
+}
+
+input[type="text"],
+input[type="url"],
+input[type="password"],
+input[type="number"],
+select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+/* Accessible focus indicators */
+input:focus, select:focus, textarea:focus, button:focus, a:focus {
+    outline: 2px solid #0066cc;
+    outline-offset: 2px;
+    border-color: #0066cc;
+}
+
+/* Only remove outline for mouse users */
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* Ensure keyboard focus is always visible */
+*:focus-visible {
+    outline: 2px solid #0066cc;
+    outline-offset: 2px;
+}
+
+small {
+    display: block;
+    margin-top: 0.25rem;
+    color: #666;
+    font-size: 0.875rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.btn-primary, .btn-secondary, .btn-small {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: #0066cc;  /* Accessible color contrast (WCAG AA) */
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0052a3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 102, 204, 0.3);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+.btn-small {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    background: #0066cc;
+    color: white;
+}
+
+.btn-danger {
+    background: #c30000;  /* Accessible contrast for error actions */
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #a00000;
+}
+
+/* Progress Page */
+.progress-container {
+    margin: 2rem 0;
+    text-align: center;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 30px;
+    background: #eee;
+    border-radius: 15px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.5s ease;
+}
+
+.progress-text {
+    font-size: 1.2rem;
+    color: #444;
+    margin: 1rem 0;
+}
+
+.progress-percentage {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #667eea;
+}
+
+.spinner {
+    margin: 2rem auto;
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.info-box {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-top: 2rem;
+}
+
+.info-box h3 {
+    margin-bottom: 1rem;
+    color: #667eea;
+}
+
+.info-box ul {
+    list-style-position: inside;
+}
+
+.info-box li {
+    margin-bottom: 0.5rem;
+}
+
+/* Results Page */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.card {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+    border-left: 4px solid #667eea;
+}
+
+.card.critical {
+    border-left-color: #dc3545;
+}
+
+.card.serious {
+    border-left-color: #fd7e14;
+}
+
+.card.moderate {
+    border-left-color: #ffc107;
+}
+
+.card.minor {
+    border-left-color: #28a745;
+}
+
+.card h3 {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+
+.card .stat {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #333;
+}
+
+.actions {
+    margin: 2rem 0;
+}
+
+.actions h2 {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    color: #667eea;
+}
+
+.download-buttons, .manual-guides {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.file-browser {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+/* Scans Table */
+.scans-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+.scans-table th,
+.scans-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.scans-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #444;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-complete {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-running {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 0;
+    color: #666;
+}
+
+.empty-state p {
+    margin-bottom: 1.5rem;
+}
+
+/* Details/Summary */
+details summary {
+    cursor: pointer;
+    user-select: none;
+}
+
+details summary h2 {
+    display: inline;
+}
+
+footer {
+    text-align: center;
+    margin-top: 2rem;
+    padding: 1rem 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+footer a {
+    color: #667eea;
+    text-decoration: none;
+}
+
+footer a:hover {
+    text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .container {
+        padding: 1rem 0.5rem;
+    }
+
+    header h1 {
+        font-size: 1.8rem;
+    }
+
+    .summary-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .download-buttons {
+        flex-direction: column;
+    }
+}
+
+/* Accessibility Enhancements */
+
+/* Screen reader only class */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* Accessible error messages with proper contrast */
+.error-message {
+    background: #fff5f5;
+    border: 2px solid #c30000;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+    color: #c30000;  /* 4.5:1 contrast ratio */
+    font-weight: 500;
+}
+
+/* ARIA live regions for dynamic updates */
+[aria-live] {
+    position: relative;
+}
+
+/* Ensure focus is visible on interactive elements */
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

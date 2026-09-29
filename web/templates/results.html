@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Results</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Accessibility Scan Results</h1>
+            <p>{{ data.total_pages }} pages scanned • {{ data.total_violations }} violations found</p>
+        </header>
+
+        <main>
+            <section class="download-section">
+                <h2>Download Reports</h2>
+                <div class="download-buttons">
+                    <a href="/download/{{ scan_id }}/violations.csv" class="btn-primary">
+                        📊 Download CSV (Jira Import)
+                    </a>
+                    <a href="/download/{{ scan_id }}/violations.json" class="btn-secondary">
+                        📄 Download JSON
+                    </a>
+                    <a href="/download/{{ scan_id }}/violations.md" class="btn-secondary">
+                        📝 Download Markdown
+                    </a>
+                </div>
+            </section>
+
+            <section class="summary-section">
+                <h2>Summary</h2>
+                <div class="summary-cards">
+                    <div class="card">
+                        <h3>Total Violations</h3>
+                        <p class="stat">{{ data.total_violations }}</p>
+                    </div>
+                    <div class="card">
+                        <h3>Pages Scanned</h3>
+                        <p class="stat">{{ data.total_pages }}</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="violations-section">
+                <h2>Violations by Page</h2>
+                {% for page in data.pages %}
+                <div class="page-result">
+                    <h3>{{ page.url }}</h3>
+                    <p><strong>Violations:</strong> {{ page.violations|length }}</p>
+
+                    {% if page.violations %}
+                    <ul class="violation-list">
+                        {% for violation in page.violations %}
+                        <li>
+                            <strong>[{{ violation.impact|upper }}]</strong>
+                            {{ violation.description }}
+                            <br>
+                            <small>{{ violation.nodes|length }} affected element(s)</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </section>
+
+            <div class="form-actions">
+                <a href="/" class="btn-secondary">New Scan</a>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
