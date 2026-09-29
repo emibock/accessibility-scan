@@ -35,7 +35,7 @@ ENV/
 scan-results/
 *.csv
 *.json
-*.md
+scan-results/**/*.md
 
 # Logs
 *.log
