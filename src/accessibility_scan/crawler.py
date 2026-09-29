@@ -16,6 +16,8 @@ class Crawler:
         self.base_domain = urlparse(self.start_url).netloc
         self.visited: Set[str] = set()
         self.discovered: Set[str] = set()
+        self.to_visit: List[str] = []
+        self.verbose = config.get("verbose", False)
 
     async def crawl(self) -> List[str]:
         """Crawl and discover pages"""
@@ -32,41 +34,77 @@ class Crawler:
             if auth:
                 await self._authenticate(page, auth)
 
-            # Start crawling
-            await self._crawl_page(page, self.start_url)
+            # Queue-based crawling (not recursive)
+            self.to_visit = [self.start_url]
+
+            while self.to_visit and len(self.visited) < self.max_pages:
+                url = self.to_visit.pop(0)
+
+                if url in self.visited:
+                    continue
+
+                if self.verbose:
+                    print(f"Crawling: {url}")
+
+                await self._crawl_page(page, url)
 
             await browser.close()
+
+            if self.verbose:
+                print(f"\nCrawl complete: {len(self.discovered)} pages discovered")
+
             return list(self.discovered)[:self.max_pages]
 
     async def _crawl_page(self, page: Page, url: str):
-        """Recursively crawl from URL"""
-        if url in self.visited or len(self.visited) >= self.max_pages:
+        """Crawl single page and extract links"""
+        if url in self.visited:
             return
 
         self.visited.add(url)
         self.discovered.add(url)
 
         try:
-            await page.goto(url, wait_until="networkidle", timeout=30000)
-        except Exception:
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(1000)  # Let page settle
+        except Exception as e:
+            if self.verbose:
+                print(f"  Error loading {url}: {e}")
             return
 
         # Extract links
-        links = await page.evaluate("""() => {
-            return Array.from(document.querySelectorAll('a[href]'))
-                .map(a => a.href)
-                .filter(href => href.startsWith('http'));
-        }""")
+        try:
+            links = await page.evaluate("""() => {
+                return Array.from(document.querySelectorAll('a[href]'))
+                    .map(a => a.href)
+                    .filter(href => href && href.startsWith('http'));
+            }""")
 
-        # Filter links to same domain
+            if self.verbose:
+                print(f"  Found {len(links)} links")
+
+        except Exception as e:
+            if self.verbose:
+                print(f"  Error extracting links: {e}")
+            return
+
+        # Add same-domain links to queue
+        new_links = 0
         for link in links:
-            if len(self.visited) >= self.max_pages:
+            if len(self.visited) + len(self.to_visit) >= self.max_pages:
                 break
 
-            if urlparse(link).netloc == self.base_domain:
-                normalized = link.split('#')[0].split('?')[0]
-                if normalized not in self.visited:
-                    await self._crawl_page(page, normalized)
+            parsed = urlparse(link)
+            if parsed.netloc == self.base_domain:
+                # Normalize: remove fragments and query params
+                normalized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+                normalized = normalized.rstrip('/')
+
+                if normalized and normalized not in self.visited and normalized not in self.to_visit:
+                    self.to_visit.append(normalized)
+                    new_links += 1
+
+        if self.verbose and new_links > 0:
+            print(f"  Added {new_links} new links to queue")
 
     async def _authenticate(self, page: Page, auth: Dict):
         """Handle authentication"""
