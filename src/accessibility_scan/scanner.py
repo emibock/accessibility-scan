@@ -67,7 +67,11 @@ class AccessibilityScanner:
     async def _authenticate(self, page: Page, auth: Dict):
         """Handle authentication"""
         login_url = auth.get("login_url")
-        if not login_url:
+        username = auth.get("username")
+        password = auth.get("password")
+
+        # Skip auth if no login URL or no credentials
+        if not login_url or not username or not password:
             return
 
         await page.goto(login_url)
