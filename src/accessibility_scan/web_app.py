@@ -180,12 +180,24 @@ def run_scan(scan_id: str, config: dict, crawl: bool):
         else:
             urls = [config["start_url"]]
 
+        # Initialize scan tracking
+        scans[scan_id]["total_pages"] = len(urls)
+        scans[scan_id]["pages_scanned"] = 0
+
+        # Progress callback
+        def update_scan_progress(pages_done: int, total: int):
+            scans[scan_id]["pages_scanned"] = pages_done
+            # Progress: 30-90% for scanning phase
+            scan_progress = int(30 + (pages_done / total) * 60)
+            scans[scan_id]["progress"] = scan_progress
+            scans[scan_id]["message"] = f"Scanning page {pages_done} of {total}..."
+
         # Scan
         scans[scan_id]["message"] = "Running accessibility scans..."
-        scans[scan_id]["progress"] = 50
+        scans[scan_id]["progress"] = 30
 
         scanner = AccessibilityScanner(config)
-        results = asyncio.run(scanner.scan(urls))
+        results = asyncio.run(scanner.scan(urls, progress_callback=update_scan_progress))
 
         # Export
         scans[scan_id]["message"] = "Generating reports..."

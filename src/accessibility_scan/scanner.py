@@ -2,7 +2,7 @@
 
 import asyncio
 from pathlib import Path
-from typing import Dict, List
+from typing import Callable, Dict, List, Optional
 from playwright.async_api import async_playwright, Page
 from axe_playwright_python.async_playwright import Axe
 
@@ -29,8 +29,8 @@ class AccessibilityScanner:
             "incomplete": len(results.incomplete)
         }
 
-    async def scan(self, urls: List[str]) -> List[Dict]:
-        """Scan multiple URLs"""
+    async def scan(self, urls: List[str], progress_callback: Optional[Callable[[int, int], None]] = None) -> List[Dict]:
+        """Scan multiple URLs with optional progress callback"""
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=self.config.get("headless", True)
@@ -45,7 +45,8 @@ class AccessibilityScanner:
                 await self._authenticate(page, auth)
 
             results = []
-            for url in urls:
+            total = len(urls)
+            for idx, url in enumerate(urls):
                 try:
                     result = await self.scan_page(page, url)
                     results.append(result)
@@ -55,6 +56,10 @@ class AccessibilityScanner:
                         "error": str(e),
                         "violations": []
                     })
+
+                # Report progress after each page
+                if progress_callback:
+                    progress_callback(idx + 1, total)
 
             await browser.close()
             return results

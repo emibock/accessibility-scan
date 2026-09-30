@@ -19,6 +19,7 @@
                 </div>
                 <p class="progress-text" id="progress-text">Starting scan...</p>
                 <p class="progress-percentage" id="progress-percentage">0%</p>
+                <p class="page-count" id="page-count" style="margin-top: 1rem; font-size: 1.1rem; color: #666;"></p>
             </div>
 
             <div class="spinner"></div>
@@ -35,6 +36,12 @@
                     document.getElementById('progress-fill').style.width = data.progress + '%';
                     document.getElementById('progress-text').textContent = data.message;
                     document.getElementById('progress-percentage').textContent = data.progress + '%';
+
+                    // Update page count if available
+                    const pageCountEl = document.getElementById('page-count');
+                    if (data.pages_scanned !== undefined && data.total_pages !== undefined) {
+                        pageCountEl.textContent = `${data.pages_scanned} of ${data.total_pages} pages scanned`;
+                    }
 
                     if (data.status === 'complete') {
                         window.location.reload();

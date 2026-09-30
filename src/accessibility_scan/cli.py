@@ -69,8 +69,10 @@ async def _run_scan(config: dict, do_crawl: bool, output_dir: str, min_severity:
     with Progress() as progress:
         task = progress.add_task("[cyan]Scanning...", total=len(urls))
 
-        results = await scanner.scan(urls)
-        progress.update(task, completed=len(urls))
+        def update_progress(pages_done: int, total: int):
+            progress.update(task, completed=pages_done)
+
+        results = await scanner.scan(urls, progress_callback=update_progress)
 
     # Export
     console.print("[cyan]Exporting results...[/cyan]")
