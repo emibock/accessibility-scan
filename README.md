@@ -31,6 +31,11 @@ accessibility-scan web
 
 Then open http://127.0.0.1:5000
 
+Features:
+- **Scan History**: View all past scans on the homepage
+- **Rerun Scans**: Click "Rerun" to prefill form with previous scan config
+- **Download Reports**: Get CSV, JSON, or Markdown from history or results page
+
 ### CLI
 
 Scan single page:

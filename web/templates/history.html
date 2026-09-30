@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan History - Accessibility Scanner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Accessibility Scanner</h1>
+            <p>Past scan results and history</p>
+        </header>
+
+        <main>
+            <div class="form-actions" style="margin-bottom: 2rem;">
+                <a href="/new" class="btn-primary">+ New Scan</a>
+            </div>
+
+            {% if scans %}
+            <section class="history-section">
+                <h2>Scan History</h2>
+                <table class="scan-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>URL</th>
+                            <th>Pages</th>
+                            <th>Violations</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for scan in scans %}
+                        <tr>
+                            <td>{{ scan.completed[:10] if scan.completed else scan.started[:10] }}</td>
+                            <td class="url-cell">{{ scan.config.start_url }}</td>
+                            <td>{{ scan.summary.total_pages if scan.summary else '-' }}</td>
+                            <td>
+                                {% if scan.summary %}
+                                <span class="violation-count">{{ scan.summary.total_violations }}</span>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if scan.status == 'complete' %}
+                                <span class="status-badge status-complete">Complete</span>
+                                {% else %}
+                                <span class="status-badge status-failed">Failed</span>
+                                {% endif %}
+                            </td>
+                            <td class="actions-cell">
+                                {% if scan.status == 'complete' %}
+                                <a href="/results/{{ scan.scan_id }}" class="btn-secondary btn-sm">View</a>
+                                {% endif %}
+                                <a href="/rerun/{{ scan.scan_id }}" class="btn-secondary btn-sm">Rerun</a>
+                                <a href="/download/{{ scan.scan_id }}/violations.csv" class="btn-secondary btn-sm"
+                                   {% if scan.status != 'complete' %}style="opacity: 0.5; pointer-events: none;"{% endif %}>
+                                   CSV
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+            {% else %}
+            <section class="empty-state">
+                <p>No scans yet. <a href="/new">Start your first scan</a></p>
+            </section>
+            {% endif %}
+        </main>
+    </div>
+
+    <style>
+        .scan-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .scan-table th,
+        .scan-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .scan-table th {
+            background: #f5f5f5;
+            font-weight: 600;
+        }
+
+        .scan-table tbody tr:hover {
+            background: #fafafa;
+        }
+
+        .url-cell {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .violation-count {
+            font-weight: 600;
+            color: #d32f2f;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .status-complete {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .status-failed {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .actions-cell {
+            white-space: nowrap;
+        }
+
+        .btn-sm {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.875rem;
+            margin-right: 0.25rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+    </style>
+</body>
+</html>

@@ -28,8 +28,43 @@ scans = {}
 
 @app.route("/")
 def index():
-    """Main scan form"""
+    """Scan history page"""
+    # Load past scans from disk
+    past_scans = []
+
+    if REPORTS_DIR.exists():
+        for scan_dir in sorted(REPORTS_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+            if not scan_dir.is_dir():
+                continue
+
+            metadata_path = scan_dir / "metadata.json"
+            if metadata_path.exists():
+                with open(metadata_path) as f:
+                    metadata = json.load(f)
+                    metadata['scan_id'] = scan_dir.name
+                    past_scans.append(metadata)
+
+    return render_template("history.html", scans=past_scans)
+
+
+@app.route("/new")
+def new_scan():
+    """New scan form"""
     return render_template("index.html")
+
+
+@app.route("/rerun/<scan_id>")
+def rerun_scan(scan_id):
+    """Prefill form with previous scan config"""
+    metadata_path = REPORTS_DIR / scan_id / "metadata.json"
+
+    if not metadata_path.exists():
+        return "Scan not found", 404
+
+    with open(metadata_path) as f:
+        metadata = json.load(f)
+
+    return render_template("index.html", config=metadata.get('config', {}))
 
 
 @app.route("/start-scan", methods=["POST"])
@@ -62,6 +97,8 @@ def start_scan():
         "started": datetime.now().isoformat(),
         "progress": 0,
         "message": "Starting scan...",
+        "config": config,
+        "crawl": request.form.get("crawl") == "on",
     }
 
     # Start scan in background
@@ -85,12 +122,22 @@ def status(scan_id):
 @app.route("/results/<scan_id>")
 def results(scan_id):
     """Results page"""
-    if scan_id not in scans:
-        return "Scan not found", 404
+    # Check in-memory first
+    if scan_id in scans:
+        scan = scans[scan_id]
+        if scan["status"] != "complete":
+            return render_template("progress.html", scan_id=scan_id)
+    else:
+        # Try to load from disk
+        metadata_path = REPORTS_DIR / scan_id / "metadata.json"
+        if not metadata_path.exists():
+            return "Scan not found", 404
 
-    scan = scans[scan_id]
-    if scan["status"] != "complete":
-        return render_template("progress.html", scan_id=scan_id)
+        with open(metadata_path) as f:
+            metadata = json.load(f)
+
+        if metadata.get("status") != "complete":
+            return "Scan not complete or failed", 404
 
     # Load results
     results_path = REPORTS_DIR / scan_id / "violations.json"
@@ -158,12 +205,49 @@ def run_scan(scan_id: str, config: dict, crawl: bool):
             "summary": summary
         })
 
+        # Save metadata for history
+        metadata = {
+            "status": "complete",
+            "started": scans[scan_id]["started"],
+            "completed": datetime.now().isoformat(),
+            "summary": summary,
+            "config": {
+                "start_url": config.get("start_url"),
+                "max_pages": config.get("max_pages"),
+                "crawl": crawl,
+            }
+        }
+
+        metadata_path = output_dir / "metadata.json"
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+
     except Exception as e:
         scans[scan_id].update({
             "status": "failed",
             "message": f"Error: {str(e)}",
             "error": str(e)
         })
+
+        # Save failed metadata
+        output_dir = REPORTS_DIR / scan_id
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        metadata = {
+            "status": "failed",
+            "started": scans[scan_id].get("started", datetime.now().isoformat()),
+            "completed": datetime.now().isoformat(),
+            "error": str(e),
+            "config": {
+                "start_url": config.get("start_url"),
+                "max_pages": config.get("max_pages"),
+                "crawl": crawl,
+            }
+        }
+
+        metadata_path = output_dir / "metadata.json"
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,9 @@
         <header>
             <h1>Accessibility Scanner</h1>
             <p>WCAG 2.1 violations exported to CSV, JSON, and Markdown</p>
+            <nav style="margin-top: 1rem;">
+                <a href="/" style="color: #1976d2;">← Back to History</a>
+            </nav>
         </header>
 
         <main>
@@ -21,20 +24,24 @@
                     <div class="form-group">
                         <label for="start_url">Start URL *</label>
                         <input type="url" id="start_url" name="start_url" required
-                               placeholder="https://example.com">
+                               placeholder="https://example.com"
+                               value="{{ config.start_url if config else '' }}">
                         <small>Homepage or main entry point</small>
                     </div>
 
                     <div class="form-group">
                         <label>
-                            <input type="checkbox" name="crawl" id="crawl">
+                            <input type="checkbox" name="crawl" id="crawl"
+                                   {% if config and config.crawl %}checked{% endif %}>
                             Crawl to discover pages (uncheck to scan single page)
                         </label>
                     </div>
 
-                    <div class="form-group" id="maxPagesGroup" style="display:none;">
+                    <div class="form-group" id="maxPagesGroup"
+                         style="display:{% if config and config.crawl %}block{% else %}none{% endif %};">
                         <label for="max_pages">Max Pages to Scan</label>
-                        <input type="number" id="max_pages" name="max_pages" value="50" min="1" max="500">
+                        <input type="number" id="max_pages" name="max_pages"
+                               value="{{ config.max_pages if config else 50 }}" min="1" max="500">
                     </div>
                 </section>
 
