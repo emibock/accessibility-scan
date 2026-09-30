@@ -79,12 +79,16 @@ def start_scan():
         "headless": True,
     }
 
-    # Auth if provided
-    if request.form.get("login_url"):
+    # Auth if provided (all required fields)
+    login_url = request.form.get("login_url")
+    username = request.form.get("username")
+    password = request.form.get("password")
+
+    if login_url and username and password:
         config["authentication"] = {
-            "login_url": request.form["login_url"],
-            "username": request.form.get("username", ""),
-            "password": request.form.get("password", ""),
+            "login_url": login_url,
+            "username": username,
+            "password": password,
             "username_selector": request.form.get("username_selector") or "input[name='username']",
             "password_selector": request.form.get("password_selector") or "input[name='password']",
             "submit_selector": request.form.get("submit_selector") or "button[type='submit']",
@@ -117,6 +121,24 @@ def status(scan_id):
         return jsonify({"error": "Scan not found"}), 404
 
     return jsonify(scans[scan_id])
+
+
+@app.route("/api/cancel/<scan_id>", methods=["POST"])
+def cancel_scan(scan_id):
+    """Cancel running scan"""
+    if scan_id not in scans:
+        return jsonify({"error": "Scan not found"}), 404
+
+    scan = scans[scan_id]
+    if scan["status"] == "running":
+        scans[scan_id].update({
+            "status": "cancelled",
+            "message": "Scan cancelled by user",
+            "completed": datetime.now().isoformat()
+        })
+        return jsonify({"status": "cancelled"})
+
+    return jsonify({"error": "Scan not running"}), 400
 
 
 @app.route("/results/<scan_id>")
@@ -171,9 +193,14 @@ def run_scan(scan_id: str, config: dict, crawl: bool):
         if crawl:
             scans[scan_id]["message"] = "Discovering pages..."
             scans[scan_id]["progress"] = 10
+            scans[scan_id]["pages_discovered"] = 0
+
+            def update_crawl_progress(discovered_count: int):
+                scans[scan_id]["pages_discovered"] = discovered_count
+                scans[scan_id]["message"] = f"Discovering pages... found {discovered_count}"
 
             crawler = Crawler(config)
-            urls = asyncio.run(crawler.crawl())
+            urls = asyncio.run(crawler.crawl(progress_callback=update_crawl_progress))
 
             scans[scan_id]["message"] = f"Found {len(urls)} pages, scanning..."
             scans[scan_id]["progress"] = 30

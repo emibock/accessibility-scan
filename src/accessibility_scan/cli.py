@@ -56,8 +56,16 @@ async def _run_scan(config: dict, do_crawl: bool, output_dir: str, min_severity:
     # Discover URLs
     if do_crawl:
         console.print("[cyan]Crawling to discover pages...[/cyan]")
+
+        last_count = [0]  # Mutable to update from callback
+
+        def crawl_progress(discovered: int):
+            if discovered > last_count[0]:
+                console.print(f"[dim]  Found {discovered} pages...[/dim]")
+                last_count[0] = discovered
+
         crawler = Crawler(config)
-        urls = await crawler.crawl()
+        urls = await crawler.crawl(progress_callback=crawl_progress)
         console.print(f"[green]Discovered {len(urls)} pages[/green]")
     else:
         urls = [config.get("start_url")]

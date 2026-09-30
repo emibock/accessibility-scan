@@ -20,6 +20,13 @@
                 <p class="progress-text" id="progress-text">Starting scan...</p>
                 <p class="progress-percentage" id="progress-percentage">0%</p>
                 <p class="page-count" id="page-count" style="margin-top: 1rem; font-size: 1.1rem; color: #666;"></p>
+                <p class="pages-discovered" id="pages-discovered" style="margin-top: 0.5rem; font-size: 1.1rem; color: #666;"></p>
+            </div>
+
+            <div style="margin-top: 2rem; text-align: center;">
+                <button id="cancel-btn" class="btn-danger" onclick="cancelScan()" style="display: none;">
+                    Cancel Scan
+                </button>
             </div>
 
             <div class="spinner"></div>
@@ -43,8 +50,26 @@
                         pageCountEl.textContent = `${data.pages_scanned} of ${data.total_pages} pages scanned`;
                     }
 
+                    // Update pages discovered during crawl
+                    const pagesDiscoveredEl = document.getElementById('pages-discovered');
+                    if (data.pages_discovered !== undefined) {
+                        pagesDiscoveredEl.textContent = `${data.pages_discovered} pages discovered`;
+                    }
+
+                    // Show cancel button if running
+                    const cancelBtn = document.getElementById('cancel-btn');
+                    if (data.status === 'running') {
+                        cancelBtn.style.display = 'inline-block';
+                    } else {
+                        cancelBtn.style.display = 'none';
+                    }
+
                     if (data.status === 'complete') {
                         window.location.reload();
+                    } else if (data.status === 'cancelled') {
+                        document.getElementById('progress-text').innerHTML =
+                            `<span style="color: #856404;">Scan cancelled</span>`;
+                        document.querySelector('.spinner').style.display = 'none';
                     } else if (data.status === 'failed') {
                         document.getElementById('progress-text').innerHTML =
                             `<span style="color: #c30000;">Error: ${data.error}</span>`;
@@ -57,6 +82,23 @@
                     console.error('Error:', error);
                     setTimeout(updateProgress, 2000);
                 });
+        }
+
+        function cancelScan() {
+            if (confirm('Are you sure you want to cancel this scan?')) {
+                fetch(`/api/cancel/${scanId}`, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'cancelled') {
+                            document.getElementById('progress-text').textContent = 'Cancelling...';
+                            document.getElementById('cancel-btn').disabled = true;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Cancel error:', error);
+                        alert('Failed to cancel scan');
+                    });
+            }
         }
 
         updateProgress();

@@ -1,7 +1,7 @@
 """Page discovery via crawling"""
 
 import asyncio
-from typing import Dict, List, Set
+from typing import Callable, Dict, List, Optional, Set
 from urllib.parse import urljoin, urlparse
 from playwright.async_api import async_playwright, Page
 
@@ -19,8 +19,8 @@ class Crawler:
         self.to_visit: List[str] = []
         self.verbose = config.get("verbose", False)
 
-    async def crawl(self) -> List[str]:
-        """Crawl and discover pages"""
+    async def crawl(self, progress_callback: Optional[Callable[[int], None]] = None) -> List[str]:
+        """Crawl and discover pages with optional progress callback"""
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=self.config.get("headless", True)
@@ -47,6 +47,10 @@ class Crawler:
                     print(f"Crawling: {url}")
 
                 await self._crawl_page(page, url)
+
+                # Report discovered count
+                if progress_callback:
+                    progress_callback(len(self.discovered))
 
             await browser.close()
 
