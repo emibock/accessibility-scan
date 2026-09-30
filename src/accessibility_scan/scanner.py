@@ -72,10 +72,10 @@ class AccessibilityScanner:
 
         await page.goto(login_url)
 
-        # Fill credentials
-        username_sel = auth.get("username_selector", "input[name='username']")
-        password_sel = auth.get("password_selector", "input[name='password']")
-        submit_sel = auth.get("submit_selector", "button[type='submit']")
+        # Fill credentials - use defaults if selectors empty
+        username_sel = auth.get("username_selector") or "input[name='username']"
+        password_sel = auth.get("password_selector") or "input[name='password']"
+        submit_sel = auth.get("submit_selector") or "button[type='submit']"
 
         await page.fill(username_sel, auth["username"])
         await page.fill(password_sel, auth["password"])

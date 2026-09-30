@@ -85,9 +85,9 @@ def start_scan():
             "login_url": request.form["login_url"],
             "username": request.form.get("username", ""),
             "password": request.form.get("password", ""),
-            "username_selector": request.form.get("username_selector", "input[name='username']"),
-            "password_selector": request.form.get("password_selector", "input[name='password']"),
-            "submit_selector": request.form.get("submit_selector", "button[type='submit']"),
+            "username_selector": request.form.get("username_selector") or "input[name='username']",
+            "password_selector": request.form.get("password_selector") or "input[name='password']",
+            "submit_selector": request.form.get("submit_selector") or "button[type='submit']",
             "success_indicator": request.form.get("success_indicator", ""),
         }
 
