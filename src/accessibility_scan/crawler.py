@@ -113,17 +113,22 @@ class Crawler:
     async def _authenticate(self, page: Page, auth: Dict):
         """Handle authentication"""
         login_url = auth.get("login_url")
-        if not login_url:
+        username = auth.get("username")
+        password = auth.get("password")
+
+        # Skip auth if no login URL or no credentials
+        if not login_url or not username or not password:
             return
 
         await page.goto(login_url)
 
-        username_sel = auth.get("username_selector", "input[name='username']")
-        password_sel = auth.get("password_selector", "input[name='password']")
-        submit_sel = auth.get("submit_selector", "button[type='submit']")
+        # Fill credentials - use defaults if selectors empty
+        username_sel = auth.get("username_selector") or "input[name='username']"
+        password_sel = auth.get("password_selector") or "input[name='password']"
+        submit_sel = auth.get("submit_selector") or "button[type='submit']"
 
-        await page.fill(username_sel, auth["username"])
-        await page.fill(password_sel, auth["password"])
+        await page.fill(username_sel, username)
+        await page.fill(password_sel, password)
         await page.click(submit_sel)
 
         success = auth.get("success_indicator")
