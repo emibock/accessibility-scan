@@ -120,6 +120,8 @@ def validate(config_file):
         max_pages = config.get('max_pages')
         if max_pages is not None and (not isinstance(max_pages, int) or max_pages < 1):
             errors.append("max_pages must be a positive integer")
+        elif max_pages is not None and max_pages > 500:
+            warnings.append(f"max_pages is {max_pages} (>500) - scan may take significant time and resources")
 
         # Auth validation
         auth = config.get('authentication')

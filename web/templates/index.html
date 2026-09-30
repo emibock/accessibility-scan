@@ -41,7 +41,10 @@
                          style="display:{% if config and config.crawl %}block{% else %}none{% endif %};">
                         <label for="max_pages">Max Pages to Scan</label>
                         <input type="number" id="max_pages" name="max_pages"
-                               value="{{ config.max_pages if config else 50 }}" min="1" max="500">
+                               value="{{ config.max_pages if config else 50 }}" min="1">
+                        <small id="maxPagesWarning" style="color: #d32f2f; display: none;">
+                            ⚠ Scanning >500 pages may take significant time and resources
+                        </small>
                     </div>
                 </section>
 
@@ -111,6 +114,13 @@
 
         document.getElementById('login_url').addEventListener('input', (e) => {
             document.getElementById('authFields').style.display = e.target.value ? 'block' : 'none';
+        });
+
+        // Warn if max_pages > 500
+        document.getElementById('max_pages').addEventListener('input', (e) => {
+            const warning = document.getElementById('maxPagesWarning');
+            const value = parseInt(e.target.value, 10);
+            warning.style.display = (value > 500) ? 'block' : 'none';
         });
 
         // Form submission
