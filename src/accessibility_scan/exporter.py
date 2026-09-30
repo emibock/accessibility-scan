@@ -11,10 +11,24 @@ from jinja2 import Environment, FileSystemLoader
 class ResultExporter:
     """Export violations to CSV, JSON, Markdown"""
 
-    def __init__(self, results: List[Dict], output_dir: Path):
+    SEVERITY_ORDER = {"critical": 4, "serious": 3, "moderate": 2, "minor": 1}
+
+    def __init__(self, results: List[Dict], output_dir: Path, min_severity: str = None):
         self.results = results
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.min_severity = min_severity.lower() if min_severity else None
+
+    def _should_include_violation(self, violation: Dict) -> bool:
+        """Check if violation meets minimum severity threshold"""
+        if not self.min_severity:
+            return True
+
+        impact = violation.get('impact', 'moderate').lower()
+        min_level = self.SEVERITY_ORDER.get(self.min_severity, 1)
+        violation_level = self.SEVERITY_ORDER.get(impact, 1)
+
+        return violation_level >= min_level
 
     def export_all(self):
         """Export to all formats"""
@@ -45,6 +59,9 @@ class ResultExporter:
                 url = page_result.get('url', '')
 
                 for violation in page_result.get('violations', []):
+                    if not self._should_include_violation(violation):
+                        continue
+
                     for node in violation.get('nodes', []):
                         writer.writerow([
                             f"[A11y] {violation['id']}: {violation['description'][:50]}...",
@@ -62,14 +79,26 @@ class ResultExporter:
         """Export full results as JSON"""
         json_path = self.output_dir / "violations.json"
 
+        # Filter results if min_severity set
+        filtered_results = []
+        for page_result in self.results:
+            filtered_violations = [
+                v for v in page_result.get('violations', [])
+                if self._should_include_violation(v)
+            ]
+            filtered_results.append({
+                **page_result,
+                'violations': filtered_violations
+            })
+
         export_data = {
             "scan_date": datetime.now().isoformat(),
-            "total_pages": len(self.results),
+            "total_pages": len(filtered_results),
             "total_violations": sum(
                 len(r.get('violations', []))
-                for r in self.results
+                for r in filtered_results
             ),
-            "pages": self.results
+            "pages": filtered_results
         }
 
         with open(json_path, 'w', encoding='utf-8') as f:
@@ -96,7 +125,10 @@ class ResultExporter:
 
             for page_result in self.results:
                 url = page_result.get('url', '')
-                violations = page_result.get('violations', [])
+                violations = [
+                    v for v in page_result.get('violations', [])
+                    if self._should_include_violation(v)
+                ]
 
                 if not violations:
                     continue
@@ -130,6 +162,9 @@ class ResultExporter:
 
         for page_result in self.results:
             for violation in page_result.get('violations', []):
+                if not self._should_include_violation(violation):
+                    continue
+
                 total_violations += len(violation.get('nodes', []))
                 impact = violation.get('impact', 'moderate').lower()
                 by_severity[impact] = by_severity.get(impact, 0) + len(violation.get('nodes', []))

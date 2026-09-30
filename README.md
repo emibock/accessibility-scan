@@ -68,6 +68,14 @@ headless: true
 
 Environment variables with `${ENV:VAR_NAME}` are expanded automatically.
 
+**Validate config before running:**
+
+```bash
+accessibility-scan validate config.yml
+```
+
+Checks for required fields, valid URLs, and auth configuration.
+
 ## Output Formats
 
 ### CSV (Jira Import)
@@ -110,6 +118,9 @@ Formatted report with violations grouped by page, including:
 ## CLI Commands
 
 ```bash
+# Validate config before scanning
+accessibility-scan validate config.yml
+
 # Scan single URL
 accessibility-scan scan --url https://example.com
 
@@ -118,6 +129,9 @@ accessibility-scan scan --config config.yml
 
 # Scan with crawling
 accessibility-scan scan --config config.yml --crawl
+
+# Filter by minimum severity
+accessibility-scan scan --url https://example.com --min-severity serious
 
 # Custom output directory
 accessibility-scan scan --url https://example.com --output ./my-results
@@ -128,6 +142,17 @@ accessibility-scan web
 # Custom web UI port
 accessibility-scan web --port 8080 --host 0.0.0.0
 ```
+
+### Severity Filtering
+
+Export only violations meeting minimum severity threshold:
+
+- `--min-severity minor` - Include all violations (default)
+- `--min-severity moderate` - Exclude minor
+- `--min-severity serious` - Exclude minor and moderate
+- `--min-severity critical` - Only critical violations
+
+Useful for Jira imports to reduce noise.
 
 ## Development
 
