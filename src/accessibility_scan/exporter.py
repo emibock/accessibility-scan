@@ -242,12 +242,9 @@ class ResultExporter:
                 f.write(f"**Total Occurrences:** {total_occ}\n\n")
 
                 f.write("### Affected Pages\n\n")
-                # Show first 20 pages
-                for i, page in enumerate(pages[:20], 1):
+                # List all affected pages
+                for i, page in enumerate(pages, 1):
                     f.write(f"{i}. {page['url']}  \n")
-
-                if len(pages) > 20:
-                    f.write(f"\n... and {len(pages) - 20} more pages\n")
 
                 f.write("\n### Acceptance Criteria\n\n")
                 f.write(f"- [ ] Fix applied to all {len(pages)} affected page(s)  \n")
