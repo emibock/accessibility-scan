@@ -23,12 +23,15 @@ class AccessibilityScanner:
         axe = Axe()
         results = await axe.run(page)
 
+        # axe-playwright-python returns AxeResults object with .response dict
+        response = results.response
+
         return {
             "url": url,
-            "violations": results.violations,
-            "passes": len(results.passes),
-            "inapplicable": len(results.inapplicable),
-            "incomplete": len(results.incomplete)
+            "violations": response.get("violations", []),
+            "passes": len(response.get("passes", [])),
+            "inapplicable": len(response.get("inapplicable", [])),
+            "incomplete": len(response.get("incomplete", []))
         }
 
     async def scan(self, urls: List[str], progress_callback: Optional[Callable[[int, int], None]] = None) -> List[Dict]:

@@ -6,10 +6,94 @@
     <title>Scan Results</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
+        .page-result {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
         .page-result h3 {
             word-break: break-all;
             overflow-wrap: anywhere;
             max-width: 100%;
+            font-size: 1rem;
+            color: #0066cc;
+            margin-bottom: 0.75rem;
+            font-weight: 500;
+        }
+
+        .page-result .violation-count {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+
+        .page-result .violation-count.has-violations {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .page-result .violation-count.no-violations {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .violation-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .violation-list li {
+            background: #f8f9fa;
+            border-left: 4px solid #dc3545;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            border-radius: 4px;
+        }
+
+        .violation-list li strong {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            margin-right: 0.5rem;
+        }
+
+        .violation-list li strong[data-impact="critical"] {
+            background: #c30000;
+            color: white;
+        }
+
+        .violation-list li strong[data-impact="serious"] {
+            background: #fd7e14;
+            color: white;
+        }
+
+        .violation-list li strong[data-impact="moderate"] {
+            background: #ffc107;
+            color: #000;
+        }
+
+        .violation-list li strong[data-impact="minor"] {
+            background: #28a745;
+            color: white;
+        }
+
+        .violation-list li small {
+            display: block;
+            margin-top: 0.5rem;
+            color: #666;
+        }
+
+        .violations-section h2 {
+            margin-bottom: 1.5rem;
         }
     </style>
 </head>
@@ -58,15 +142,18 @@
                 {% for page in data.pages %}
                 <div class="page-result">
                     <h3>{{ page.url }}</h3>
-                    <p><strong>Violations:</strong> {{ page.violations|length }}</p>
+
+                    {% set violation_count = page.violations|length %}
+                    <div class="violation-count {% if violation_count > 0 %}has-violations{% else %}no-violations{% endif %}">
+                        {{ violation_count }} violation{% if violation_count != 1 %}s{% endif %}
+                    </div>
 
                     {% if page.violations %}
                     <ul class="violation-list">
                         {% for violation in page.violations %}
                         <li>
-                            <strong>[{{ violation.impact|upper }}]</strong>
+                            <strong data-impact="{{ violation.impact|lower }}">{{ violation.impact|upper }}</strong>
                             {{ violation.description }}
-                            <br>
                             <small>{{ violation.nodes|length }} affected element(s)</small>
                         </li>
                         {% endfor %}

@@ -43,19 +43,15 @@
                     document.getElementById('progress-text').textContent = data.message;
                     document.getElementById('progress-percentage').textContent = data.progress + '%';
 
-                    // Update page stats - unified display
+                    // Update page stats - only show during scan phase
                     const pageStatsEl = document.getElementById('page-stats');
                     let statsText = '';
 
-                    // During crawl phase
-                    if (data.pages_discovered !== undefined && data.progress < 30) {
-                        statsText = `Discovered: ${data.pages_discovered} pages`;
-                    }
-                    // During scan phase
-                    else if (data.pages_scanned !== undefined && data.total_pages !== undefined) {
+                    // Only show stats during scan phase (not during crawl)
+                    if (data.pages_scanned !== undefined && data.total_pages !== undefined) {
                         const discovered = data.total_pages;
                         const scanned = data.pages_scanned;
-                        statsText = `Pages: ${discovered} discovered, ${scanned} scanned`;
+                        statsText = `${scanned} of ${discovered} pages scanned`;
                     }
 
                     pageStatsEl.textContent = statsText;
