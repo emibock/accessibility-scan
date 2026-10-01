@@ -19,8 +19,7 @@
                 </div>
                 <p class="progress-text" id="progress-text">Starting scan...</p>
                 <p class="progress-percentage" id="progress-percentage">0%</p>
-                <p class="page-count" id="page-count" style="margin-top: 1rem; font-size: 1.1rem; color: #666;"></p>
-                <p class="pages-discovered" id="pages-discovered" style="margin-top: 0.5rem; font-size: 1.1rem; color: #666;"></p>
+                <p class="page-stats" id="page-stats" style="margin-top: 1rem; font-size: 1.1rem; color: #666;"></p>
             </div>
 
             <div style="margin-top: 2rem; text-align: center;">
@@ -44,17 +43,22 @@
                     document.getElementById('progress-text').textContent = data.message;
                     document.getElementById('progress-percentage').textContent = data.progress + '%';
 
-                    // Update page count if available
-                    const pageCountEl = document.getElementById('page-count');
-                    if (data.pages_scanned !== undefined && data.total_pages !== undefined) {
-                        pageCountEl.textContent = `${data.pages_scanned} of ${data.total_pages} pages scanned`;
+                    // Update page stats - unified display
+                    const pageStatsEl = document.getElementById('page-stats');
+                    let statsText = '';
+
+                    // During crawl phase
+                    if (data.pages_discovered !== undefined && data.progress < 30) {
+                        statsText = `Discovered: ${data.pages_discovered} pages`;
+                    }
+                    // During scan phase
+                    else if (data.pages_scanned !== undefined && data.total_pages !== undefined) {
+                        const discovered = data.total_pages;
+                        const scanned = data.pages_scanned;
+                        statsText = `Pages: ${discovered} discovered, ${scanned} scanned`;
                     }
 
-                    // Update pages discovered during crawl
-                    const pagesDiscoveredEl = document.getElementById('pages-discovered');
-                    if (data.pages_discovered !== undefined) {
-                        pagesDiscoveredEl.textContent = `${data.pages_discovered} pages discovered`;
-                    }
+                    pageStatsEl.textContent = statsText;
 
                     // Show cancel button if running
                     const cancelBtn = document.getElementById('cancel-btn');

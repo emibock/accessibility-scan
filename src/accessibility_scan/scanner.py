@@ -16,7 +16,9 @@ class AccessibilityScanner:
 
     async def scan_page(self, page: Page, url: str) -> Dict:
         """Scan single page for violations"""
-        await page.goto(url, wait_until="networkidle", timeout=30000)
+        # Use "load" instead of "networkidle" - many sites never reach networkidle
+        # due to ads, analytics, etc. "load" waits for DOMContentLoaded + all resources
+        await page.goto(url, wait_until="load", timeout=30000)
 
         axe = Axe()
         results = await axe.run(page)
