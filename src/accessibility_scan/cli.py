@@ -100,6 +100,7 @@ async def _run_scan(config: dict, do_crawl: bool, output_dir: str, min_severity:
     console.print(f"  - violations.csv (Jira import)")
     console.print(f"  - violations.json (full data)")
     console.print(f"  - violations.md (readable report)")
+    console.print(f"  - jira-tickets.md (consolidated tickets)")
 
 
 @main.command()

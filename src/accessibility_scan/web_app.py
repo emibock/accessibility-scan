@@ -175,7 +175,7 @@ def results(scan_id):
 @app.route("/download/<scan_id>/<filename>")
 def download(scan_id, filename):
     """Download result file"""
-    allowed = ["violations.csv", "violations.json", "violations.md"]
+    allowed = ["violations.csv", "violations.json", "violations.md", "jira-tickets.md"]
     if filename not in allowed:
         return "Invalid file", 400
 

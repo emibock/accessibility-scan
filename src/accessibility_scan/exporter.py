@@ -35,6 +35,7 @@ class ResultExporter:
         self.export_csv()
         self.export_json()
         self.export_markdown()
+        self.export_jira_tickets()
 
     def export_csv(self) -> Path:
         """Export violations as CSV for Jira import"""
@@ -154,6 +155,133 @@ class ResultExporter:
                     f.write("\n---\n\n")
 
         return md_path
+
+    def export_jira_tickets(self) -> Path:
+        """Export consolidated Jira ticket report - one ticket per violation type"""
+        jira_path = self.output_dir / "jira-tickets.md"
+
+        # Group violations by ID across all pages
+        violations_by_id = {}
+
+        for page_result in self.results:
+            url = page_result.get('url', '')
+            for violation in page_result.get('violations', []):
+                if not self._should_include_violation(violation):
+                    continue
+
+                vid = violation.get('id')
+                if vid not in violations_by_id:
+                    violations_by_id[vid] = {
+                        'id': vid,
+                        'description': violation.get('description', ''),
+                        'impact': violation.get('impact', 'moderate'),
+                        'help': violation.get('helpUrl', ''),
+                        'tags': violation.get('tags', []),
+                        'pages': [],
+                        'total_occurrences': 0
+                    }
+
+                # Add this page and count occurrences
+                node_count = len(violation.get('nodes', []))
+                violations_by_id[vid]['pages'].append({
+                    'url': url,
+                    'occurrences': node_count
+                })
+                violations_by_id[vid]['total_occurrences'] += node_count
+
+        # Map impact to priority
+        impact_to_priority = {
+            'critical': 'Critical',
+            'serious': 'Major',
+            'moderate': 'Normal',
+            'minor': 'Minor'
+        }
+
+        # Sort by impact (critical first) then by total occurrences
+        impact_order = {'critical': 0, 'serious': 1, 'moderate': 2, 'minor': 3}
+        sorted_violations = sorted(
+            violations_by_id.values(),
+            key=lambda v: (impact_order.get(v['impact'], 4), -v['total_occurrences'])
+        )
+
+        # Write markdown
+        with open(jira_path, 'w', encoding='utf-8') as f:
+            f.write("# Jira Tickets - Accessibility Remediation\n\n")
+            f.write(f"**Total Tickets:** {len(sorted_violations)}\n\n")
+            f.write("This document contains all proposed Jira tickets for accessibility violations ")
+            f.write("found during automated scanning. Each ticket represents a unique violation type ")
+            f.write("that may affect multiple pages.\n\n")
+            f.write("---\n\n")
+
+            for idx, violation in enumerate(sorted_violations, 1):
+                impact = violation['impact']
+                priority = impact_to_priority.get(impact, 'Normal')
+                vid = violation['id']
+                desc = violation['description']
+                pages = violation['pages']
+                total_occ = violation['total_occurrences']
+                tags = violation['tags']
+                help_url = violation['help']
+
+                # Extract WCAG criteria from tags
+                wcag_criteria = [t for t in tags if t.startswith('wcag')]
+                wcag_display = ', '.join([t.replace('wcag', '').replace('a', '.a.a') for t in wcag_criteria])
+
+                f.write(f"## Ticket {idx}: {desc}\n\n")
+                f.write(f"**Priority:** {priority}  ")
+                f.write(f"**Impact:** {impact}  ")
+                f.write(f"**Violation ID:** `{vid}`\n\n")
+
+                f.write("### Summary\n\n")
+                f.write(f"{desc}\n\n")
+
+                f.write("### Description\n\n")
+                f.write(f"**Issue:** {desc}\n\n")
+                f.write(f"**WCAG Criteria:** {wcag_display or 'N/A'}\n\n")
+                f.write(f"**Affected Pages:** {len(pages)} page(s)  ")
+                f.write(f"**Total Occurrences:** {total_occ}\n\n")
+
+                f.write("### Affected Pages\n\n")
+                # Show first 20 pages
+                for i, page in enumerate(pages[:20], 1):
+                    f.write(f"{i}. {page['url']}  \n")
+
+                if len(pages) > 20:
+                    f.write(f"\n... and {len(pages) - 20} more pages\n")
+
+                f.write("\n### Acceptance Criteria\n\n")
+                f.write(f"- [ ] Fix applied to all {len(pages)} affected page(s)  \n")
+                f.write(f"- [ ] Automated scan shows no violations for `{vid}`  \n")
+                f.write(f"- [ ] Manual testing confirms accessibility improvement  \n")
+                f.write(f"- [ ] No regressions introduced\n\n")
+
+                f.write("### Resources\n\n")
+                f.write(f"- **WCAG Reference:** {help_url}  \n")
+
+                # Add quick reference links for WCAG criteria
+                for tag in wcag_criteria:
+                    criteria_num = tag.replace('wcag', '').replace('a', '')
+                    f.write(f"- **{wcag_display} Quick Reference:** ")
+                    f.write(f"https://www.w3.org/WAI/WCAG21/quickref/#{criteria_num}\n")
+
+                f.write("\n### Labels\n\n")
+                f.write(f"`accessibility`, `wcag`, `{impact}`\n\n")
+                f.write("---\n\n")
+
+            # Summary by priority
+            f.write("## Summary by Priority\n\n")
+            priority_counts = {'Critical': 0, 'Major': 0, 'Normal': 0, 'Minor': 0}
+            for v in sorted_violations:
+                priority = impact_to_priority.get(v['impact'], 'Normal')
+                priority_counts[priority] += 1
+
+            for priority, count in priority_counts.items():
+                f.write(f"- **{priority}:** {count} ticket(s)  \n")
+
+            f.write("\n---\n\n")
+            f.write("*Generated by Accessibility Scanner*\n")
+
+        return jira_path
 
     def get_summary(self) -> Dict:
         """Get summary statistics"""
