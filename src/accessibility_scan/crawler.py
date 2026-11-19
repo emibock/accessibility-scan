@@ -115,20 +115,29 @@ class Crawler:
         login_url = auth.get("login_url")
         username = auth.get("username")
         password = auth.get("password")
+        submit_sel = auth.get("submit_selector")
 
-        # Skip auth if no login URL or no credentials
-        if not login_url or not username or not password:
+        has_credentials = bool(username and password)
+
+        # Skip auth if no login URL, or no credentials and no explicit submit
+        # selector to click (click-only auth must not fall back to a default
+        # selector - the button has to be named explicitly)
+        if not login_url or not (has_credentials or submit_sel):
             return
 
         await page.goto(login_url)
 
-        # Fill credentials - use defaults if selectors empty
-        username_sel = auth.get("username_selector") or "input[name='username']"
-        password_sel = auth.get("password_selector") or "input[name='password']"
-        submit_sel = auth.get("submit_selector") or "button[type='submit']"
+        if has_credentials:
+            # Fill credentials - use defaults if selectors empty
+            username_sel = auth.get("username_selector") or "input[name='username']"
+            password_sel = auth.get("password_selector") or "input[name='password']"
+            submit_sel = submit_sel or "button[type='submit']"
 
-        await page.fill(username_sel, username)
-        await page.fill(password_sel, password)
+            await page.fill(username_sel, username)
+            await page.fill(password_sel, password)
+
+        # Click-only auth (guest/SSO): just click the sign-in button,
+        # no credential fields to fill
         await page.click(submit_sel)
 
         success = auth.get("success_indicator")

@@ -144,10 +144,14 @@ def validate(config_file):
         if auth:
             if not auth.get('login_url'):
                 warnings.append("authentication.login_url not set")
-            if not auth.get('username'):
-                warnings.append("authentication.username not set")
-            if not auth.get('password'):
-                warnings.append("authentication.password not set")
+            # Click-only auth (login_url + submit_selector, no form fields)
+            # is valid without credentials, so only warn about missing
+            # username/password when there is no submit selector either
+            if not auth.get("submit_selector"):
+                if not auth.get('username'):
+                    warnings.append("authentication.username not set")
+                if not auth.get('password'):
+                    warnings.append("authentication.password not set")
 
         # Report results
         if errors:

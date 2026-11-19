@@ -24,5 +24,11 @@ authentication:
   # Element visible after successful login
   success_indicator: .user-menu
 
+  # Click-only auth (guest/SSO sign-in with no form fields) - omit
+  # username/password and provide an explicit submit selector
+  # login_url: https://example.com/login
+  # submit_selector: button[type='submit']
+  # success_indicator: .user-menu
+
 # Browser settings
 headless: true

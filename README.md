@@ -78,6 +78,24 @@ headless: true
 
 Environment variables with `${ENV:VAR_NAME}` are expanded automatically.
 
+### Click-only authentication
+
+For guest or SSO sign-ins that are just a button click (no username/password
+fields), configure `login_url` and an explicit `submit_selector` and omit the
+credentials:
+
+```yaml
+authentication:
+  login_url: https://example.com/login
+  submit_selector: button[type='submit']
+  success_indicator: .user-menu
+```
+
+The scanner goes to the login URL and clicks the selector. Username and
+password are only filled when both are set, so credential-based configs keep
+working unchanged. In click-only mode the selector must be explicit — there is
+no default.
+
 **Validate config before running:**
 
 ```bash

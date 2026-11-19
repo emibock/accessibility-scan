@@ -80,21 +80,36 @@ def start_scan():
         "wcag_level": request.form.get("wcag_level", "2.2"),
     }
 
-    # Auth if provided (all required fields)
+    # Auth if provided - full credentials or click-only (submit button only)
     login_url = request.form.get("login_url")
     username = request.form.get("username")
     password = request.form.get("password")
+    submit_selector = request.form.get("submit_selector")
 
-    if login_url and username and password:
-        config["authentication"] = {
+    has_credentials = bool(username and password)
+
+    if login_url and (has_credentials or submit_selector):
+        auth_config = {
             "login_url": login_url,
-            "username": username,
-            "password": password,
-            "username_selector": request.form.get("username_selector") or "input[name='username']",
-            "password_selector": request.form.get("password_selector") or "input[name='password']",
-            "submit_selector": request.form.get("submit_selector") or "button[type='submit']",
+            # Default only applies to the credential path; click-only auth
+            # requires an explicit selector
+            "submit_selector": submit_selector or "button[type='submit']",
             "success_indicator": request.form.get("success_indicator", ""),
         }
+
+        if has_credentials:
+            auth_config.update(
+                {
+                    "username": username,
+                    "password": password,
+                    "username_selector": request.form.get("username_selector")
+                    or "input[name='username']",
+                    "password_selector": request.form.get("password_selector")
+                    or "input[name='password']",
+                }
+            )
+
+        config["authentication"] = auth_config
 
     # Init scan state
     scans[scan_id] = {
