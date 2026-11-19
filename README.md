@@ -76,6 +76,17 @@ authentication:
 headless: true
 ```
 
+For client-rendered SPAs (e.g. Backstage) where content appears after the
+browser `load` event, set `settle_ms` to pause before axe runs:
+
+```yaml
+# Wait 4 seconds after load for JavaScript to render content
+settle_ms: 4000
+```
+
+Without it (default `0`), axe may scan a partially empty DOM and report false
+positives such as a missing level-one heading that exists once the page paints.
+
 Environment variables with `${ENV:VAR_NAME}` are expanded automatically.
 
 **Validate config before running:**

@@ -32,6 +32,13 @@ class AccessibilityScanner:
         # due to ads, analytics, etc. "load" waits for DOMContentLoaded + all resources
         await page.goto(url, wait_until="load", timeout=30000)
 
+        # Optional settle delay for client-rendered SPAs (e.g. Backstage):
+        # "load" fires before JavaScript renders content, so axe would run
+        # against a partially empty DOM and report false positives
+        settle_ms = self.config.get("settle_ms", 0)
+        if settle_ms > 0:
+            await page.wait_for_timeout(settle_ms)
+
         axe = Axe()
 
         # Configure axe to run only rules for the specified WCAG level

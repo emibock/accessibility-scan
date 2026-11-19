@@ -26,3 +26,7 @@ authentication:
 
 # Browser settings
 headless: true
+
+# Post-load delay in milliseconds before axe runs - increase for
+# client-rendered SPAs where content appears after the load event
+# settle_ms: 4000  # post-load delay before axe runs (client-rendered SPAs)
