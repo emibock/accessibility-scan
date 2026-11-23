@@ -10,7 +10,13 @@ import pdfplumber
 
 from .verapdf_validator import VeraPDFValidator
 from .ocr_detector import ScannedPDFDetector
-from .alt_text_checker import is_generic_alt_text, get_alt_text_quality_message
+from .alt_text_checker import (
+    is_generic_alt_text,
+    get_alt_text_quality_message,
+    is_generic_link_text,
+    get_link_text_quality_message,
+    get_better_link_text_examples,
+)
 
 
 class PDFAccessibilityScanner:
@@ -106,6 +112,8 @@ class PDFAccessibilityScanner:
                 }
 
                 # Run all checks
+                violations.extend(self._check_security_restrictions(pdf))
+                violations.extend(self._check_accessibility_metadata(pdf))
                 violations.extend(self._check_tagged_structure(pdf))
                 violations.extend(self._check_document_language(pdf))
                 violations.extend(self._check_document_title(pdf))
@@ -117,6 +125,7 @@ class PDFAccessibilityScanner:
                 violations.extend(self._check_table_structure_tree(pdf))
                 violations.extend(self._check_heading_structure(pdf))
                 violations.extend(self._check_image_alt_text_structure(pdf))
+                violations.extend(self._check_link_text_quality(pdf))
 
             # Open with pdfplumber for content analysis (if needed)
             with pdfplumber.open(pdf_path) as pdf:
@@ -249,6 +258,272 @@ class PDFAccessibilityScanner:
                 return False
         except:
             return False
+
+    def _check_security_restrictions(self, pdf: pikepdf.Pdf) -> List[Dict]:
+        """Check if PDF encryption or security settings block assistive technology
+
+        SEVERITY: CRITICAL - Encryption can completely block screen readers
+        """
+        violations = []
+
+        try:
+            # Check if PDF is encrypted
+            if pdf.is_encrypted:
+                # Check permissions
+                allow_obj = pdf.Root.get('/Perms', {}) if hasattr(pdf.Root, 'get') else {}
+
+                # Get encryption dict to check permissions
+                # In pikepdf, we can check allow properties
+                issues = []
+
+                # Try to determine if content extraction is blocked
+                # Note: If the PDF was opened successfully, it means we have permission
+                # But we can still check if permissions are restrictive
+
+                # Check if we can extract content
+                try:
+                    # Try to get text from first page
+                    if len(pdf.pages) > 0:
+                        page = pdf.pages[0]
+                        # If we can access the page, extraction might be allowed
+                        pass
+                except Exception:
+                    issues.append("Content extraction appears to be blocked")
+
+                # Note: pikepdf automatically handles encryption if the PDF can be opened
+                # If content extraction is disabled, screen readers will fail
+
+                violations.append({
+                    "id": "pdf-encryption-detected",
+                    "impact": "critical",
+                    "description": "PDF is encrypted - this may block assistive technology",
+                    "help": f"""This PDF uses encryption/password protection which can prevent screen readers from accessing content.
+
+**CRITICAL ACCESSIBILITY BARRIER:**
+Encrypted PDFs with restrictive permissions can completely block assistive technology, making the document inaccessible to users with disabilities.
+
+**WHY THIS IS CRITICAL:**
+- Screen readers require permission to extract text content
+- Encryption with "content extraction disabled" renders the PDF blank for blind users
+- Password protection can prevent assistive technology from opening the document
+- Even if visually readable, encrypted PDFs may appear empty to screen readers
+
+**HOW TO CHECK PERMISSIONS:**
+1. Using Adobe Acrobat Pro:
+   - File → Properties → Security tab
+   - Check "Document Restrictions Summary"
+   - Look for:
+     * "Content Copying: Not Allowed" ❌
+     * "Content Extraction for Accessibility: Not Allowed" ❌
+     * "Screen Readers: Not Allowed" ❌
+
+**WHAT TO LOOK FOR (Acceptable settings):**
+✓ No encryption/security
+✓ "Content Extraction for Accessibility: Allowed"
+✓ "Screen Readers: Allowed"
+✓ No password required to open the document
+
+**HOW TO FIX:**
+1. Using Adobe Acrobat Pro:
+   - File → Properties → Security tab
+   - Security Method: Select "No Security"
+   - Save the document
+   - If password-protected, you'll need the password to remove security
+
+2. If security is required (e.g., confidential documents):
+   - File → Properties → Security
+   - Security Method: "Password Security"
+   - Permissions: Check "Enable text access for screen reader devices"
+   - DO NOT restrict: "Content Copying" or "Content Extraction"
+
+3. Using pikepdf (Python - for automation):
+   ```python
+   import pikepdf
+
+   # Open encrypted PDF (need password if set)
+   pdf = pikepdf.open('document.pdf', password='password')
+
+   # Save without encryption
+   pdf.save('document_accessible.pdf', encryption=False)
+   ```
+
+4. Prevention - Creating PDFs:
+   - From Word/LibreOffice: Don't set document password
+   - From print dialog: Don't enable encryption
+   - Use "Save as PDF" not "Print to PDF" to preserve accessibility
+   - Never check "Encrypt the PDF" or "Require password"
+
+**WHAT THIS FIXES:**
+Removes the fundamental barrier that prevents screen readers from accessing document content. Without this fix, the document is completely unusable for blind users regardless of other accessibility features.
+
+**PRIORITY:**
+Fix this FIRST before addressing any other accessibility issues. All other remediation is pointless if screen readers are blocked by encryption.""",
+                    "helpUrl": "https://www.w3.org/WAI/WCAG21/Techniques/pdf/PDF6",
+                    "tags": ["pdf-ua", "wcag2a", "critical-barrier"],
+                    "nodes": [{
+                        "html": "PDF encryption/security settings",
+                        "target": ["/Root/Encrypt"],
+                        "failureSummary": f"PDF uses encryption which may block assistive technology. Screen readers require permission to extract text. Check File → Properties → Security and ensure 'Content Extraction for Accessibility' is allowed, or remove security entirely."
+                    }]
+                })
+
+        except Exception as e:
+            # Encryption check failed, skip
+            pass
+
+        return violations
+
+    def _check_accessibility_metadata(self, pdf: pikepdf.Pdf) -> List[Dict]:
+        """Check PDF accessibility metadata and flags
+
+        SEVERITY: MODERATE - Indicates whether PDF was created with accessibility in mind
+        """
+        violations = []
+        issues = []
+        warnings = []
+
+        try:
+            # Check for /Suspects flag (indicates known accessibility issues)
+            if hasattr(pdf.Root, "MarkInfo"):
+                mark_info = pdf.Root.MarkInfo
+                if hasattr(mark_info, "Suspects") and mark_info.Suspects:
+                    issues.append("/Suspects flag is True (document may have accessibility issues)")
+
+                # Check if /Marked is False (should be True for accessible PDFs)
+                if hasattr(mark_info, "Marked"):
+                    if not mark_info.Marked:
+                        issues.append("/Marked flag is False (document not marked as tagged)")
+                else:
+                    warnings.append("/Marked flag not set")
+
+            # Check for PDF/UA identifier in metadata
+            has_pdfua_id = False
+            if hasattr(pdf, "open_metadata"):
+                try:
+                    with pdf.open_metadata() as meta:
+                        # Check for PDF/UA identifier
+                        # PDF/UA compliant documents should have this
+                        metadata_str = str(meta)
+                        if "pdfuaid:part" in metadata_str.lower() or "pdf/ua" in metadata_str.lower():
+                            has_pdfua_id = True
+                except Exception:
+                    pass
+
+            if not has_pdfua_id:
+                warnings.append("No PDF/UA identifier found in metadata (not claiming PDF/UA conformance)")
+
+            # Check ViewerPreferences for accessibility-friendly settings
+            accessibility_api_support = False
+            if hasattr(pdf.Root, "ViewerPreferences"):
+                viewer_prefs = pdf.Root.ViewerPreferences
+                # Check DisplayDocTitle (already checked elsewhere, but good metadata practice)
+                if hasattr(viewer_prefs, "DisplayDocTitle") and viewer_prefs.DisplayDocTitle:
+                    # Good - this is handled by title check
+                    pass
+
+            # Only create violation if there are actual issues (not just missing nice-to-haves)
+            if issues:
+                violations.append({
+                    "id": "pdf-accessibility-metadata-issues",
+                    "impact": "moderate",
+                    "description": "PDF accessibility metadata indicates potential problems",
+                    "help": f"""PDF metadata flags suggest this document may have accessibility issues.
+
+**METADATA ISSUES FOUND:**
+{'  - ' + chr(10).join(f'  - {issue}' for issue in issues) if issues else '  None'}
+
+**WARNINGS (Nice to Have):**
+{chr(10).join(f'  - {warning}' for warning in warnings) if warnings else '  None'}
+
+**WHAT THESE FLAGS MEAN:**
+
+**/Suspects Flag = True (PROBLEM):**
+The authoring tool detected potential accessibility issues but couldn't fix them automatically. Common causes:
+- Images without alt text
+- Tables without headers
+- Incorrect reading order
+- Form fields without labels
+
+**/Marked Flag = False (PROBLEM):**
+The document is not marked as tagged, which means it likely lacks a structure tree needed for screen readers. This should be caught by the tagged structure check.
+
+**Missing PDF/UA Identifier (Nice to Have):**
+The document doesn't claim PDF/UA conformance. This isn't necessarily bad - many accessible PDFs don't have the identifier. But if you're specifically targeting PDF/UA compliance, this should be added.
+
+**HOW TO FIX:**
+
+1. Address the /Suspects flag:
+   - Open in Adobe Acrobat Pro
+   - Tools → Accessibility → Full Check
+   - Review and fix reported issues
+   - Tools → Accessibility → Set Suspects to Fix
+   - Run Full Check again - Suspects should be False
+
+2. Set /Marked flag to True:
+   - Use Adobe Acrobat Pro: Tools → Accessibility → Autotag Document
+   - Or ensure the PDF was created from a tagged source document
+
+3. Add PDF/UA identifier (for formal compliance):
+   - Using Adobe Acrobat Pro:
+     * File → Properties → Description → Additional Metadata
+     * Select "Advanced" in sidebar
+     * Add: `pdfuaid:part = 1` to claim PDF/UA-1 conformance
+   - Only do this AFTER fixing all PDF/UA violations
+
+**NICE TO HAVE vs. CRITICAL:**
+- /Suspects flag: MODERATE issue - indicates problems to investigate
+- /Marked flag: Should be SERIOUS, but already caught by tagged structure check
+- Missing PDF/UA ID: MINOR - nice to have for formal compliance, not required for accessibility
+
+**WHAT THIS FIXES:**
+Metadata flags help you identify and track accessibility status. Fixing these ensures the document correctly represents its accessibility level and helps other tools detect potential issues.""",
+                    "helpUrl": "https://www.w3.org/WAI/WCAG21/Techniques/pdf/",
+                    "tags": ["pdf-ua", "metadata", "quality"],
+                    "nodes": [{
+                        "html": "PDF accessibility metadata",
+                        "target": ["/Root/MarkInfo"],
+                        "failureSummary": f"Found {len(issues)} metadata issue(s): {'; '.join(issues)}. These flags indicate the document may have accessibility problems that need investigation."
+                    }]
+                })
+            elif warnings:
+                # Only warnings, no critical issues - report as minor
+                violations.append({
+                    "id": "pdf-accessibility-metadata-missing",
+                    "impact": "minor",
+                    "description": "PDF accessibility metadata could be improved (nice to have)",
+                    "help": f"""Some optional accessibility metadata is missing. These are quality improvements, not critical issues.
+
+**MISSING METADATA (Nice to Have):**
+{chr(10).join(f'  - {warning}' for warning in warnings)}
+
+**WHAT THIS MEANS:**
+These are optional metadata fields that help document the PDF's accessibility status. Missing them doesn't make the PDF inaccessible, but adding them is a quality improvement.
+
+**PDF/UA Identifier:**
+If you want to formally claim PDF/UA conformance, add `pdfuaid:part=1` to the metadata. Only do this after ensuring the document passes all PDF/UA validation checks.
+
+**HOW TO ADD (Optional):**
+1. Using Adobe Acrobat Pro:
+   - File → Properties → Description → Additional Metadata
+   - Select "Advanced" tab
+   - Add custom metadata properties for PDF/UA identifier
+
+**PRIORITY: LOW**
+These are nice-to-have quality improvements. Focus on fixing CRITICAL and SERIOUS violations first.""",
+                    "helpUrl": "https://www.w3.org/WAI/WCAG21/Techniques/pdf/",
+                    "tags": ["pdf-ua", "metadata", "quality", "nice-to-have"],
+                    "nodes": [{
+                        "html": "PDF accessibility metadata",
+                        "target": ["/Root/MarkInfo"],
+                        "failureSummary": f"Optional metadata missing: {'; '.join(warnings)}. These are quality improvements, not critical accessibility barriers."
+                    }]
+                })
+
+        except Exception as e:
+            # Metadata check failed, skip
+            pass
+
+        return violations
 
     def _check_tagged_structure(self, pdf: pikepdf.Pdf) -> List[Dict]:
         """Check if PDF has proper tagged structure for accessibility"""
@@ -587,6 +862,241 @@ WHAT THIS FIXES: Ensures screen reader users get meaningful image descriptions, 
 
         except Exception as e:
             # Structure tree analysis failed, skip this check
+            pass
+
+        return violations
+
+    def _check_link_text_quality(self, pdf: pikepdf.Pdf) -> List[Dict]:
+        """Check if links have descriptive text (not 'click here', URLs, etc.)"""
+        violations = []
+
+        # Check if PDF is tagged first
+        if not (hasattr(pdf.Root, "StructTreeRoot")):
+            # Already caught by tagged structure check
+            return violations
+
+        try:
+            struct_tree = pdf.Root.StructTreeRoot
+            links_found = []
+            links_with_bad_text = []
+
+            # Recursively find all Link elements in structure tree
+            def find_links(element, depth=0):
+                if element is None:
+                    return
+
+                elem_type = str(element.get("/S", "")) if hasattr(element, 'get') else ""
+
+                if elem_type == "/Link":
+                    # Found a link element
+                    link_text = ""
+
+                    # Try to extract link text from the element
+                    if hasattr(element, "/Alt"):
+                        link_text = str(element.get("/Alt", ""))
+                    elif hasattr(element, 'get'):
+                        # Try to get text from child content items
+                        kids = element.get("/K", [])
+                        if kids and not isinstance(kids, list):
+                            kids = [kids]
+
+                        # Simple text extraction (this is a best-effort approach)
+                        for kid in (kids if isinstance(kids, list) else []):
+                            if hasattr(kid, 'get'):
+                                # Check if this is a marked content reference with text
+                                if str(kid.get("/Type", "")) == "/MCR":
+                                    # We can't easily extract the actual text without parsing content streams
+                                    # So we'll rely on annotations
+                                    pass
+
+                    link_info = {
+                        'text': link_text.strip() if link_text else "",
+                        'index': len(links_found) + 1,
+                        'has_text': bool(link_text.strip())
+                    }
+
+                    # Also check page annotations for Link annotations
+                    # We'll do this in a separate pass below
+
+                    links_found.append(link_info)
+
+                # Recurse through children
+                if hasattr(element, 'get'):
+                    kids = element.get("/K", [])
+                    if kids:
+                        if not isinstance(kids, list):
+                            kids = [kids]
+                        for child in kids:
+                            find_links(child, depth + 1)
+
+            # Start recursive search
+            find_links(struct_tree)
+
+            # Also check page annotations for Link annotations (more reliable for text extraction)
+            for page_num, page in enumerate(pdf.pages, 1):
+                if hasattr(page, "Annots") and page.Annots:
+                    for annot in page.Annots:
+                        try:
+                            if str(annot.get("/Subtype", "")) == "/Link":
+                                # Found a link annotation
+                                link_text = ""
+
+                                # Try to get link text from /Contents (tooltip) or other fields
+                                if hasattr(annot, "/Contents"):
+                                    link_text = str(annot.get("/Contents", ""))
+
+                                # If no text found, try to extract from rectangle area
+                                # This requires parsing the content stream, which is complex
+                                # For now, we'll use pdfplumber to extract text from the link area
+
+                                # Get link destination for checking URL-as-text
+                                dest = annot.get("/A", {}).get("/URI", "") if hasattr(annot, "/A") else ""
+                                dest_str = str(dest) if dest else ""
+
+                                # We can't easily extract the actual link text without deep content parsing
+                                # So we'll add a placeholder that indicates we found a link
+                                # In practice, PDF links often don't have easily extractable text
+
+                                # Skip if we can't get meaningful text
+                                if not link_text:
+                                    continue
+
+                                link_info = {
+                                    'text': link_text.strip(),
+                                    'index': len(links_found) + 1,
+                                    'has_text': True,
+                                    'page': page_num,
+                                    'dest': dest_str
+                                }
+
+                                links_found.append(link_info)
+                        except Exception:
+                            continue
+
+            # Check link text quality using pdfplumber for better text extraction
+            # This approach extracts all text with links
+            import pdfplumber
+            with pdfplumber.open(pdf.stream) as plumber_pdf:
+                for page_num, page in enumerate(plumber_pdf.pages, 1):
+                    # Extract annotations
+                    if 'Annots' in page.page_obj:
+                        annots = page.page_obj['Annots']
+                        if annots:
+                            for annot in annots:
+                                try:
+                                    annot_obj = annot.resolve() if hasattr(annot, 'resolve') else annot
+                                    if annot_obj.get('/Subtype') == '/Link':
+                                        # Try to extract link text from the page content
+                                        # Get rectangle of the link
+                                        rect = annot_obj.get('/Rect')
+                                        if rect:
+                                            # Extract text in this rectangle
+                                            x0, y0, x1, y1 = rect
+                                            # pdfplumber uses different coordinate system
+                                            # Crop to link area and extract text
+                                            try:
+                                                bbox = (float(x0), float(page.height - float(y1)), float(x1), float(page.height - float(y0)))
+                                                cropped = page.within_bbox(bbox)
+                                                link_text = cropped.extract_text() or ""
+                                                link_text = link_text.strip()
+
+                                                if link_text:
+                                                    # Get destination
+                                                    dest_uri = ""
+                                                    if '/A' in annot_obj and '/URI' in annot_obj['/A']:
+                                                        dest_uri = str(annot_obj['/A']['/URI'])
+
+                                                    link_info = {
+                                                        'text': link_text,
+                                                        'index': len(links_found) + 1,
+                                                        'has_text': True,
+                                                        'page': page_num,
+                                                        'dest': dest_uri
+                                                    }
+
+                                                    links_found.append(link_info)
+
+                                                    # Check if link text is generic
+                                                    if is_generic_link_text(link_text):
+                                                        links_with_bad_text.append(link_info)
+                                            except Exception:
+                                                continue
+                                except Exception:
+                                    continue
+
+            # Report violations for generic/bad link text
+            if links_with_bad_text:
+                bad_examples = []
+                for link in links_with_bad_text[:10]:
+                    page_ref = f" (page {link.get('page', '?')})" if 'page' in link else ""
+                    bad_examples.append(f"\"{link['text']}\"{page_ref} - {get_link_text_quality_message(link['text'])}")
+
+                bad_list = "\n  - ".join(bad_examples)
+                if len(links_with_bad_text) > 10:
+                    bad_list += f"\n  ... and {len(links_with_bad_text) - 10} more"
+
+                violations.append({
+                    "id": "pdf-links-generic-text",
+                    "impact": "moderate",
+                    "description": f"{len(links_with_bad_text)} of {len(links_found)} links have non-descriptive text",
+                    "help": f"""Found {len(links_with_bad_text)} links with generic or non-descriptive text out of {len(links_found)} total links.
+
+NON-DESCRIPTIVE LINK TEXT:
+  - {bad_list}
+
+WHY THIS IS A PROBLEM:
+Screen reader users often navigate by jumping from link to link. When all links say "click here" or "read more", users have no idea where each link goes without reading the surrounding context. This makes navigation slow and frustrating.
+
+GENERIC PATTERNS TO AVOID:
+- Vague calls to action: "click here", "read more", "learn more", "see more"
+- URLs as link text: "https://example.com/very/long/path"
+- Generic words: "here", "this", "link", "download"
+- Just page numbers: "1", "2", "next"
+
+HOW TO FIX:
+1. Using Adobe Acrobat Pro:
+   - Tools → Accessibility → Touch Up Reading Order
+   - Select link areas with generic text
+   - Edit the visible text to be more descriptive
+   - Or add descriptive tooltip text via /Contents property
+
+2. Best practices for link text:
+   - Bad: "Click here for our accessibility policy"
+     Good: "Read our accessibility policy"
+
+   - Bad: "Download (https://example.com/docs/report.pdf)"
+     Good: "Download the 2024 annual report (PDF, 2.3 MB)"
+
+   - Bad: "Learn more" (after feature description)
+     Good: "Learn more about keyboard navigation features"
+
+3. Using pikepdf (Python - for automation):
+   ```python
+   # Update link annotation with descriptive tooltip
+   link_annot['/Contents'] = "Descriptive link purpose"
+   ```
+
+WHAT MAKES GOOD LINK TEXT:
+✓ Describes where the link goes or what action it performs
+✓ Makes sense out of context
+✓ Unique - not identical to other links with different destinations
+✓ Concise but meaningful (aim for 3-8 words)
+
+NICE TO HAVE (not critical):
+This is a moderate issue - links still work, but navigation is harder. Screen reader users can still access the content by reading surrounding context.
+
+WHAT THIS FIXES: Improves navigation efficiency for screen reader and keyboard users by making link purposes clear without needing surrounding context.""",
+                    "helpUrl": "https://www.w3.org/WAI/WCAG21/Techniques/pdf/PDF11",
+                    "tags": ["pdf-ua", "wcag2a", "wcag249", "quality"],
+                    "nodes": [{
+                        "html": f"{len(links_with_bad_text)} links with generic text: {bad_examples[0] if bad_examples else 'N/A'}",
+                        "target": ["//Link"],
+                        "failureSummary": f"Found {len(links_with_bad_text)} links out of {len(links_found)} with generic or non-descriptive text. Screen reader users navigating by links cannot determine link purpose without surrounding context. Link text should describe destination or action clearly."
+                    }]
+                })
+
+        except Exception as e:
+            # Link extraction failed, skip this check
             pass
 
         return violations

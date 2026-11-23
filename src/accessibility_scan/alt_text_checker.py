@@ -130,3 +130,138 @@ Bad: "photo1.jpg" or "DSC_5678" """
     # Default examples
     return """Good: Describe what the image shows and its purpose
 Bad: Filenames, generic words, or placeholder text"""
+
+
+# Link Text Quality Checking
+# ===========================
+
+def is_generic_link_text(link_text: str) -> bool:
+    """Check if link text appears to be generic/non-descriptive
+
+    Args:
+        link_text: The link text to check
+
+    Returns:
+        True if the link text appears generic, False if it seems descriptive
+    """
+    if not link_text:
+        return False
+
+    text_lower = link_text.lower().strip()
+
+    # Common generic link phrases
+    generic_phrases = [
+        # Click/action words alone
+        "click here", "click this", "click", "tap here", "tap this",
+        # Generic directions
+        "here", "there", "this", "that",
+        # Vague calls to action
+        "read more", "learn more", "more", "more info", "more information",
+        "see more", "view more", "find out more",
+        # Generic download/document links
+        "download", "download here", "download now", "get it here",
+        "pdf", "document", "file",
+        # Just "link"
+        "link", "hyperlink", "url",
+        # Generic navigation
+        "continue", "next", "previous", "back", "go",
+        # Single letters/numbers
+        "a", "b", "c", "1", "2", "3",
+    ]
+
+    if text_lower in generic_phrases:
+        return True
+
+    # URLs as link text (the whole link is a URL)
+    if text_lower.startswith(('http://', 'https://', 'www.', 'ftp://')):
+        return True
+
+    # Email addresses as link text
+    if '@' in text_lower and '.' in text_lower and len(text_lower.split()) == 1:
+        return True
+
+    # Very short non-descriptive text (1-2 characters)
+    if len(link_text.strip()) <= 2:
+        return True
+
+    # Page numbers only
+    if re.match(r'^page\s*\d+$', text_lower):
+        return True
+
+    # Just punctuation or numbers
+    if re.match(r'^[\d\s\-_.,:;!?]+$', link_text):
+        return True
+
+    return False
+
+
+def get_link_text_quality_message(link_text: str) -> str:
+    """Get a helpful message about why link text is considered generic
+
+    Args:
+        link_text: The generic link text
+
+    Returns:
+        A descriptive message explaining the issue
+    """
+    text_lower = link_text.lower().strip()
+
+    # Click here variants
+    if 'click' in text_lower or text_lower in ['here', 'there']:
+        return f'Generic phrase "{link_text}" doesn\'t describe destination'
+
+    # Read/learn more
+    if 'more' in text_lower or text_lower in ['read', 'learn', 'see']:
+        return f'Vague "{link_text}" doesn\'t indicate what user will find'
+
+    # URL
+    if text_lower.startswith(('http://', 'https://', 'www.')):
+        return f'Raw URL "{link_text[:40]}..." is not descriptive for screen readers'
+
+    # Email
+    if '@' in text_lower:
+        return f'Email address "{link_text}" - should use contact name instead'
+
+    # Very short
+    if len(link_text.strip()) <= 2:
+        return f'Too short to be meaningful: "{link_text}"'
+
+    # Download
+    if text_lower in ['download', 'pdf', 'document']:
+        return f'Generic "{link_text}" doesn\'t describe what document'
+
+    # Default
+    return f'Non-descriptive link text: "{link_text}"'
+
+
+def get_better_link_text_examples(link_text: str, context: str = "") -> str:
+    """Provide examples of better link text based on the generic text
+
+    Args:
+        link_text: The generic link text
+        context: Context hint if available
+
+    Returns:
+        Examples of better link text
+    """
+    text_lower = link_text.lower()
+
+    if 'click here' in text_lower or text_lower in ['here', 'there', 'this']:
+        return """Good: "Download the 2024 Annual Report (PDF, 2.3 MB)"
+Bad: "Click here to download" or "Here" """
+
+    if 'more' in text_lower:
+        return """Good: "Read our accessibility policy" or "Learn about WCAG 2.2 requirements"
+Bad: "Read more" or "Learn more" """
+
+    if text_lower.startswith(('http://', 'https://')):
+        return """Good: "W3C Web Accessibility Initiative" or "Contact support team"
+Bad: "https://www.w3.org/WAI/" or the full URL """
+
+    if 'download' in text_lower or 'pdf' in text_lower:
+        return """Good: "Product specification sheet (PDF)" or "Installation guide (3 pages)"
+Bad: "Download" or "PDF" """
+
+    # Default
+    return """Good: Describe the destination or action clearly
+Bad: Generic phrases, URLs, or vague calls to action"""

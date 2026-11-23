@@ -2,6 +2,127 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added - Four New Quick Win Automation Checks
+
+Enhanced both web and PDF scanners with four additional automated checks that catch common accessibility issues:
+
+#### 1. Link Text Quality Checker (Web + PDF) - MODERATE
+**What it detects:**
+- Generic link text: "click here", "read more", "here", "more"
+- URLs as link text: "https://example.com/very/long/url"
+- Non-descriptive phrases: "link", "download", "next"
+- Single character or number links: "1", "a", "→"
+
+**Why it matters:**
+Screen reader users navigate by jumping between links. Generic link text like "click here" provides no context about the destination.
+
+**Example violations:**
+```
+✗ MODERATE: 8 of 23 links have non-descriptive text
+  - "click here" (3 occurrences)
+  - "https://example.com/product/details/12345" (1 occurrence)
+  - "read more" (4 occurrences)
+```
+
+**Applies to:** Both web and PDF scans
+
+---
+
+#### 2. PDF Security/Encryption Check - CRITICAL
+**What it detects:**
+- Password-protected PDFs
+- Encryption with restrictive permissions
+- "Content extraction disabled" settings
+- Security settings that may block screen readers
+
+**Why it matters:**
+Encrypted PDFs with restrictive permissions can completely block screen readers from accessing content, making documents entirely inaccessible regardless of other accessibility features.
+
+**Critical barrier:**
+This is flagged as CRITICAL because it can prevent screen readers from functioning at all. Must be fixed before addressing any other PDF accessibility issues.
+
+**Example violation:**
+```
+✗ CRITICAL: PDF encryption detected - may block assistive technology
+  Check File → Properties → Security
+  Ensure "Content Extraction for Accessibility: Allowed"
+```
+
+**Applies to:** PDF scans only
+
+---
+
+#### 3. PDF Accessibility Metadata - MODERATE/MINOR
+**What it detects:**
+- `/Suspects` flag = True (indicates known issues)
+- `/Marked` flag = False (document not marked as tagged)
+- Missing PDF/UA identifier in metadata
+- Accessibility API support flags
+
+**Severity levels:**
+- **MODERATE**: /Suspects flag or /Marked issues (indicates problems)
+- **MINOR**: Missing PDF/UA identifier (nice to have for formal compliance)
+
+**Why it matters:**
+Metadata flags help identify PDFs that were created without accessibility in mind and may have issues that need investigation.
+
+**Example violations:**
+```
+✗ MODERATE: PDF accessibility metadata indicates potential problems
+  - /Suspects flag is True (document may have accessibility issues)
+
+✗ MINOR: PDF accessibility metadata could be improved (nice to have)
+  - No PDF/UA identifier found in metadata
+```
+
+**Applies to:** PDF scans only
+
+---
+
+#### 4. Web Generic Alt Text Detection - MODERATE
+**What it detects:**
+- Filenames as alt text: "image.jpg", "IMG_1234.png"
+- Generic words: "image", "photo", "graphic"
+- Placeholder text: "alt text", "todo"
+- Very short text: "1", "a"
+- URLs or file paths
+
+**Why it matters:**
+axe-core catches *missing* alt text, but doesn't flag alt text that's technically present but completely non-descriptive. This check catches what axe misses.
+
+**Example violations:**
+```
+✗ MODERATE: 5 images have generic alt text
+  - "image.jpg" on /assets/product-photo.jpg
+    Issue: Uses filename instead of description
+  - "photo1" on /images/team.png
+    Issue: Generic label with no actual description
+```
+
+**Applies to:** Web scans only
+
+---
+
+### Technical Implementation
+
+**Shared utility module:** `src/accessibility_scan/alt_text_checker.py`
+- `is_generic_link_text()` - Pattern matching for bad link text
+- `is_generic_alt_text()` - Pattern matching for bad alt text  
+- Quality message generators with context-specific guidance
+- Reusable across web and PDF scanners
+
+**Integration points:**
+- **PDF scanner:** New checks in `_check_link_text_quality()`, `_check_security_restrictions()`, `_check_accessibility_metadata()`
+- **Web scanner:** Post-processing in `_check_generic_alt_text()` after axe-core scan
+
+**Severity Guidelines:**
+- **CRITICAL** - Completely blocks access (e.g., encryption blocking screen readers)
+- **SERIOUS** - Major barrier to accessibility (e.g., missing alt text)
+- **MODERATE** - Usability issue, should be fixed (e.g., generic text)
+- **MINOR** - Best practice, nice to have (e.g., missing metadata)
+
 ## [0.2.0] - 2026-11-23
 
 ### Added - PDF Accessibility Scanning

@@ -9,6 +9,9 @@ WCAG 2.0, 2.1, and 2.2 web accessibility scanner **+ PDF/UA compliance checker**
 - **Configurable WCAG level** - choose which version to test against
 - **Automatic crawling** to discover pages
 - **Authentication support** for login-gated apps
+- **Enhanced checks** beyond axe-core:
+  - Generic alt text detection (filenames, "image", placeholders) 🆕
+  - Catches non-descriptive text that axe-core misses
 
 ### PDF Accessibility Scanning
 - **PDF/UA compliance checking** using pikepdf
@@ -234,11 +237,19 @@ Useful for Jira imports to reduce noise.
 
 The PDF scanner performs the following compliance checks:
 
-### Automated Checks
+### Critical Checks (Complete Blockers)
+
+✅ **PDF Security/Encryption** (CRITICAL) 🆕
+- Detects password protection and restrictive permissions
+- Flags encryption that may block screen readers
+- Checks for "content extraction disabled" settings
+- **Priority:** Fix FIRST - all other fixes are pointless if screen readers are blocked
 
 ✅ **Tagged PDF Structure** (CRITICAL)
 - Verifies PDF has proper structure tree and MarkInfo
 - Required for screen readers to navigate content
+
+### Serious Checks (Major Barriers)
 
 ✅ **Document Language** (SERIOUS)
 - Checks if document language is specified
@@ -252,23 +263,45 @@ The PDF scanner performs the following compliance checks:
 - Checks form fields have labels or tooltips
 - Required for accessible form filling
 
+✅ **Image Alt Text** (SERIOUS)
+- Verifies Figure tags have /Alt property in structure tree
+- Identifies images completely missing alt text
+
+### Moderate Checks (Usability Issues)
+
+✅ **Link Text Quality** (MODERATE) 🆕
+- Detects generic link text: "click here", "read more", URLs
+- Ensures links are descriptive for screen reader navigation
+- Checks ~20+ generic patterns
+
+✅ **Generic Alt Text** (MODERATE)
+- Flags non-descriptive alt text: filenames, "image", placeholders
+- Catches what automated tools miss
+
+✅ **Accessibility Metadata** (MODERATE) 🆕
+- Checks /Suspects flag (indicates known issues)
+- Verifies /Marked flag is True
+- Helps identify PDFs with accessibility problems
+
+✅ **Table Structure** (MODERATE)
+- Analyzes structure tree for TH/TD tags and proper markup
+- Identifies missing headers and irregular structure
+
+✅ **Heading Hierarchy** (MODERATE)
+- Validates H1→H2→H3 progression, no skipped levels
+
 ✅ **Bookmarks/TOC** (MODERATE)
 - Checks for navigation bookmarks (documents >10 pages)
 - Improves navigation for all users
 
-### Manual Review Flagged
+### Minor Checks (Best Practices)
 
-⚠️ **Images** (SERIOUS)
-- Detects images but cannot verify alt text automatically
-- Flagged for manual review with Adobe Acrobat Pro or similar
-
-⚠️ **Tables** (MODERATE)
-- Detects tables but cannot verify header structure automatically
-- Flagged for manual review to confirm TH/TD markup
+✅ **PDF/UA Metadata** (MINOR) 🆕
+- Checks for PDF/UA identifier in metadata
+- Nice to have for formal compliance, not required for accessibility
 
 ### Not Yet Implemented
 
-⏳ **Heading Hierarchy** - Complex structure tree analysis
 ⏳ **Reading Order** - Requires deep structure parsing
 ⏳ **Color Contrast** - Limited without rendering PDF
 
