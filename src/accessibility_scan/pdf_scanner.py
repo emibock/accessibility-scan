@@ -10,6 +10,7 @@ import pdfplumber
 
 from .verapdf_validator import VeraPDFValidator
 from .ocr_detector import ScannedPDFDetector
+from .alt_text_checker import is_generic_alt_text, get_alt_text_quality_message
 
 
 class PDFAccessibilityScanner:
@@ -115,10 +116,10 @@ class PDFAccessibilityScanner:
                 violations.extend(self._check_bookmarks(pdf))
                 violations.extend(self._check_table_structure_tree(pdf))
                 violations.extend(self._check_heading_structure(pdf))
+                violations.extend(self._check_image_alt_text_structure(pdf))
 
-            # Open with pdfplumber for content analysis
+            # Open with pdfplumber for content analysis (if needed)
             with pdfplumber.open(pdf_path) as pdf:
-                violations.extend(self._check_image_alt_text(pdf))
                 violations.extend(self._check_reading_order(pdf))
 
             # Count passes and incomplete
@@ -426,78 +427,175 @@ WHAT THIS FIXES: Makes documents identifiable in browser tabs, screen reader doc
 
         return violations
 
+    def _check_image_alt_text_structure(self, pdf: pikepdf.Pdf) -> List[Dict]:
+        """Check if images have alternative text by analyzing structure tree"""
+        violations = []
+
+        # Check if PDF is tagged first
+        if not (hasattr(pdf.Root, "StructTreeRoot")):
+            # Already caught by tagged structure check
+            return violations
+
+        try:
+            struct_tree = pdf.Root.StructTreeRoot
+            figures_found = []
+            figures_without_alt = []
+            figures_with_bad_alt = []
+
+            # Recursively find all Figure elements
+            def find_figures(element, depth=0):
+                if element is None:
+                    return
+
+                elem_type = str(element.get("/S", "")) if hasattr(element, 'get') else ""
+
+                if elem_type == "/Figure":
+                    # Found a figure, check for alt text
+                    has_alt = hasattr(element, "/Alt") or (hasattr(element, 'get') and element.get("/Alt") is not None)
+                    alt_text = str(element.get("/Alt", "")) if hasattr(element, 'get') else ""
+
+                    figure_info = {
+                        'has_alt': has_alt,
+                        'alt_text': alt_text.strip(),
+                        'index': len(figures_found) + 1
+                    }
+
+                    figures_found.append(figure_info)
+
+                    # Check if alt text is missing or bad
+                    if not has_alt or not alt_text.strip():
+                        figures_without_alt.append(figure_info)
+                    elif is_generic_alt_text(alt_text.strip()):
+                        figures_with_bad_alt.append(figure_info)
+
+                # Recurse through children
+                if hasattr(element, 'get'):
+                    kids = element.get("/K", [])
+                    if kids:
+                        if not isinstance(kids, list):
+                            kids = [kids]
+                        for child in kids:
+                            find_figures(child, depth + 1)
+
+            # Start recursive search
+            find_figures(struct_tree)
+
+            # Report violations for missing alt text
+            if figures_without_alt:
+                missing_list = ", ".join([f"Figure {f['index']}" for f in figures_without_alt[:10]])
+                if len(figures_without_alt) > 10:
+                    missing_list += f"... and {len(figures_without_alt) - 10} more"
+
+                violations.append({
+                    "id": "pdf-images-missing-alt",
+                    "impact": "serious",
+                    "description": f"{len(figures_without_alt)} of {len(figures_found)} images lack alternative text - completely inaccessible to screen readers",
+                    "help": f"""Found {len(figures_without_alt)} images without alt text out of {len(figures_found)} total images in PDF.
+
+IMAGES WITHOUT ALT TEXT: {missing_list}
+
+WHY THIS IS SERIOUS:
+Images without alt text are completely invisible to screen reader users. The user has no idea what visual information they're missing.
+
+HOW TO FIX:
+1. Using Adobe Acrobat Pro:
+   - Tools > Accessibility > Reading Order
+   - Find each image marked as <Figure>
+   - Right-click > Edit Alternate Text
+   - Add descriptive text explaining what the image shows
+   - For decorative images: check "Decorative figure"
+
+2. Best practices for alt text:
+   - Describe the content and function, not just "image"
+   - Good: "Line graph showing revenue growth from 2020 to 2024, increasing from $2M to $5M"
+   - Bad: "graph.png" or "image" or "" (empty)
+   - Keep it concise but meaningful (aim for 150 characters or less)
+   - For complex diagrams: provide detailed description in document body
+
+3. Using pikepdf (Python - for automation):
+   ```python
+   # Find Figure tags in structure tree and add /Alt property
+   figure.Alt = "Description of the image"
+   ```
+
+WHAT TO VERIFY:
+✓ Every Figure tag has /Alt property
+✓ Alt text is descriptive, not generic
+✓ Decorative images are marked as Artifact, not Figure
+
+WHAT THIS FIXES: Makes visual information accessible to blind users via screen reader descriptions.""",
+                    "helpUrl": "https://www.w3.org/WAI/WCAG21/Techniques/pdf/PDF1",
+                    "tags": ["pdf-ua", "wcag2a", "wcag111"],
+                    "nodes": [{
+                        "html": f"{len(figures_without_alt)} images without alt text: {missing_list}",
+                        "target": ["//Figure"],
+                        "failureSummary": f"Structure tree contains {len(figures_found)} Figure tags. {len(figures_without_alt)} have missing or empty /Alt property. Screen readers cannot describe these images to blind users. Each Figure tag must have /Alt property with descriptive text."
+                    }]
+                })
+
+            # Report violations for generic/bad alt text
+            if figures_with_bad_alt:
+                bad_examples = []
+                for f in figures_with_bad_alt[:5]:
+                    bad_examples.append(f"Figure {f['index']}: \"{f['alt_text']}\"")
+
+                bad_list = "; ".join(bad_examples)
+                if len(figures_with_bad_alt) > 5:
+                    bad_list += f"... and {len(figures_with_bad_alt) - 5} more"
+
+                violations.append({
+                    "id": "pdf-images-generic-alt",
+                    "impact": "moderate",
+                    "description": f"{len(figures_with_bad_alt)} images have generic or non-descriptive alternative text",
+                    "help": f"""Found {len(figures_with_bad_alt)} images with generic alt text that doesn't meaningfully describe the image.
+
+GENERIC ALT TEXT EXAMPLES: {bad_list}
+
+WHY THIS IS A PROBLEM:
+Alt text like "image", "photo", "IMG_1234.jpg", or "figure" tells screen reader users nothing useful. It's nearly as bad as missing alt text entirely.
+
+GENERIC PATTERNS TO AVOID:
+- Filenames: "image.jpg", "IMG_1234.png", "photo.gif"
+- Generic words: "image", "photo", "picture", "graphic", "figure"
+- Just numbers: "1", "2", "figure1"
+- Placeholder text: "image description", "alt text", "placeholder"
+
+HOW TO FIX:
+Replace generic alt text with actual descriptions:
+- Bad: "image.jpg"
+  Good: "Screenshot of accessibility settings panel showing keyboard navigation options"
+- Bad: "graph"
+  Good: "Bar chart comparing website traffic between mobile and desktop users, showing mobile at 65%"
+- Bad: "figure1"
+  Good: "Workflow diagram illustrating the PDF remediation process from scan to validation"
+
+WHAT MAKES GOOD ALT TEXT:
+✓ Describes what the image shows, not that it IS an image
+✓ Conveys the same information a sighted user would get
+✓ Concise but complete (aim for 1-2 sentences)
+✓ Provides context relevant to the document
+
+WHAT THIS FIXES: Ensures screen reader users get meaningful image descriptions, not useless generic text.""",
+                    "helpUrl": "https://www.w3.org/WAI/WCAG21/Techniques/pdf/PDF1",
+                    "tags": ["pdf-ua", "wcag2a", "wcag111", "quality"],
+                    "nodes": [{
+                        "html": f"{len(figures_with_bad_alt)} images with generic alt: {bad_list}",
+                        "target": ["//Figure"],
+                        "failureSummary": f"Found {len(figures_with_bad_alt)} Figure tags with generic alt text that doesn't describe the image. Examples: {bad_list}. Alt text should be descriptive and meaningful, not filenames or generic words."
+                    }]
+                })
+
+        except Exception as e:
+            # Structure tree analysis failed, skip this check
+            pass
+
+        return violations
+
     def _check_heading_hierarchy(self, pdf: pdfplumber.PDF) -> List[Dict]:
         """Check for logical heading hierarchy (placeholder)"""
         # This is complex and requires analyzing structure tree
         # For MVP, we'll add a manual check reminder
         return []
-
-    def _check_image_alt_text(self, pdf: pdfplumber.PDF) -> List[Dict]:
-        """Check if images have alternative text (placeholder)"""
-        violations = []
-
-        # Count images across all pages
-        total_images = 0
-        images_by_page = []
-        for idx, page in enumerate(pdf.pages, 1):
-            if hasattr(page, 'images'):
-                page_image_count = len(page.images)
-                if page_image_count > 0:
-                    total_images += page_image_count
-                    images_by_page.append(f"Page {idx}: {page_image_count} image(s)")
-
-        if total_images > 0:
-            page_list = "; ".join(images_by_page[:5])
-            if len(images_by_page) > 5:
-                page_list += f"... and {len(images_by_page) - 5} more pages"
-
-            violations.append({
-                "id": "pdf-images-need-review",
-                "impact": "serious",
-                "description": f"PDF contains {total_images} images across {len(images_by_page)} pages - all images must be manually verified for alternative text",
-                "help": f"""This PDF contains {total_images} embedded images. Each image must have alternative text (alt text) so screen reader users can understand the visual content.
-
-IMAGES FOUND: {page_list}
-
-HOW TO CHECK & FIX:
-1. Using Adobe Acrobat Pro:
-   - Open PDF in Acrobat Pro
-   - Tools > Accessibility > Reading Order
-   - Check each image to see if it's tagged as <Figure> with alt text
-   - Right-click image > Edit Alternate Text
-   - For decorative images: Mark as "Decorative" (no alt text needed)
-   - For informative images: Add descriptive alt text
-
-2. Best practices for alt text:
-   - Describe what the image shows, not that it's an image
-   - Good: "Bar chart showing 23% increase in sales from Q1 to Q2"
-   - Bad: "Image of a chart" or "Chart1.png"
-   - For decorative images (borders, spacers): mark as decorative
-   - For complex images (detailed charts/diagrams): provide longer description nearby in document
-
-3. Using structure tree (advanced):
-   - Each image should be tagged as <Figure> in structure tree
-   - Figure tag should have /Alt property with descriptive text
-   - Decorative images should use <Artifact> tag instead
-
-WHAT TO VERIFY:
-✓ Every meaningful image has descriptive alt text
-✓ Decorative images are marked as artifacts
-✓ Alt text describes content/function, not appearance
-✓ Charts/graphs have text alternatives explaining data
-✓ Complex images have detailed descriptions in document body
-
-WHAT THIS FIXES: Ensures blind and low-vision users can understand visual content through screen reader descriptions.""",
-                "helpUrl": "https://www.w3.org/WAI/WCAG21/Techniques/pdf/PDF1",
-                "tags": ["pdf-ua", "wcag2a", "wcag111", "needs-manual-review"],
-                "nodes": [{
-                    "html": f"{total_images} images detected: {page_list}",
-                    "target": ["//Figure"],
-                    "failureSummary": f"Found {total_images} images in document structure. Automated tools cannot verify if alternative text (/Alt property) is present and descriptive. Manual review required: open in Adobe Acrobat Pro > Tools > Accessibility > Reading Order to check each Figure tag for appropriate alt text."
-                }]
-            })
-
-        return violations
 
     def _check_reading_order(self, pdf: pdfplumber.PDF) -> List[Dict]:
         """Check reading order logic (placeholder)"""
