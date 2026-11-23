@@ -39,6 +39,10 @@ dev = [
     "black>=24.0.0",
     "ruff>=0.6.0",
 ]
+ocr = [
+    "Pillow>=10.0.0",
+    "pytesseract>=0.3.10",
+]
 
 [project.scripts]
 accessibility-scan = "accessibility_scan.cli:main"

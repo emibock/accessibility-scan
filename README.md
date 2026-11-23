@@ -339,6 +339,116 @@ The scan results will indicate which validator was used:
 
 If verapdf fails or times out (>60s), the scanner automatically falls back to Python-based checks with no loss of functionality.
 
+## Scanned PDF Detection
+
+The scanner can automatically **detect scanned (image-only) PDFs** using OCR analysis. Scanned PDFs are fundamentally inaccessible - they appear completely blank to screen readers.
+
+### Why Detect Scanned PDFs?
+
+**The Problem:**
+- Scanned PDFs are images, not text
+- Screen readers cannot read them at all
+- Most severe accessibility barrier in PDFs
+- Often overlooked until users report issues
+
+**The Solution:**
+- Automatic detection using OCR comparison
+- Flags scanned PDFs as CRITICAL violations
+- Provides detailed remediation guidance
+- Prevents distribution of inaccessible documents
+
+### How It Works
+
+The detector:
+1. Extracts embedded text from PDF (what screen readers see)
+2. Renders PDF pages as images
+3. Runs OCR (Tesseract) on images (what humans see)
+4. Compares the two: significantly more OCR text = scanned PDF
+
+### Installing OCR Detection
+
+**1. Install Python packages:**
+```bash
+pip install -e ".[ocr]"
+```
+
+This installs:
+- `Pillow` - Image processing
+- `pytesseract` - Python wrapper for Tesseract OCR
+
+**2. Install Tesseract OCR:**
+
+**macOS:**
+```bash
+brew install tesseract
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt-get update
+sudo apt-get install tesseract-ocr
+```
+
+**Linux (Fedora/RHEL):**
+```bash
+sudo dnf install tesseract
+```
+
+**Windows:**
+Download installer from https://github.com/tesseract-ocr/tesseract/wiki
+
+**Verify installation:**
+```bash
+tesseract --version
+```
+
+### Using OCR Detection
+
+OCR detection is **automatic** when available:
+
+```bash
+# Automatically detects scanned PDFs
+accessibility-scan scan-pdf --file document.pdf
+```
+
+**Disable OCR detection:**
+```yaml
+# config.yml
+detect_scanned: false
+```
+
+**Output when scanned PDF detected:**
+```
+✗ CRITICAL: pdf-scanned-document
+  PDF appears to be a scanned image without a text layer
+  
+  Detection: 45 chars embedded vs 2,847 chars via OCR (95% confidence)
+  
+  FIX: Run OCR + remediation in Adobe Acrobat Pro
+       Or recreate from source document
+```
+
+### What Gets Flagged
+
+**Flagged as scanned (CRITICAL):**
+- Pure image PDFs with no text layer
+- PDFs with minimal text (<10% of OCR-detected text)
+- High confidence detections (>80%)
+
+**Not flagged:**
+- PDFs with proper text layer
+- PDFs with mostly selectable text
+- Low confidence detections (<50%)
+
+### Without OCR Detection
+
+The scanner still works perfectly without OCR detection - it just won't automatically flag scanned PDFs. All other PDF checks (tagging, language, forms, etc.) still run normally.
+
+**When OCR unavailable:**
+- No CRITICAL violation for scanned PDFs
+- Other accessibility issues still detected
+- Manual inspection needed for scanned documents
+
 ## Development
 
 ```bash

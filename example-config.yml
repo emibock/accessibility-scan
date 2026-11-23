@@ -42,3 +42,8 @@ verapdf_profile: "PDFUA-1"
 # Maximum PDF file size for remote downloads (MB)
 # Default: 50
 max_file_size: 50
+
+# Detect scanned (image-only) PDFs using OCR
+# Requires: pip install -e ".[ocr]" and tesseract installation
+# Default: true (will use OCR detection if available)
+detect_scanned: true

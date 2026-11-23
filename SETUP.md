@@ -68,6 +68,49 @@ verapdf --version
 **Without verapdf:**  
 The scanner still works perfectly using built-in Python checks. verapdf is recommended for comprehensive validation but not required.
 
+### 6. (Optional) Install OCR detection for scanned PDF identification
+
+To automatically detect scanned (image-only) PDFs, install OCR capabilities:
+
+**Install Python packages:**
+```bash
+pip install -e ".[ocr]"
+```
+
+**Install Tesseract OCR:**
+
+**macOS:**
+```bash
+brew install tesseract
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt-get install tesseract-ocr
+```
+
+**Linux (Fedora/RHEL):**
+```bash
+sudo dnf install tesseract
+```
+
+**Windows:**  
+Download from https://github.com/tesseract-ocr/tesseract/wiki
+
+**Verify:**
+```bash
+tesseract --version
+```
+
+**What OCR detection provides:**
+- Automatically identifies scanned (image-only) PDFs
+- Flags them as CRITICAL violations
+- Most severe accessibility barrier - completely unreadable by screen readers
+- Provides detailed remediation guidance (run OCR, recreate from source)
+
+**Without OCR detection:**  
+The scanner still works perfectly. It just won't automatically flag scanned PDFs - you'll need to check manually.
+
 ## Usage
 
 ### Web UI (Recommended for beginners)

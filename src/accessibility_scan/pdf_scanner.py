@@ -9,6 +9,7 @@ import pikepdf
 import pdfplumber
 
 from .verapdf_validator import VeraPDFValidator
+from .ocr_detector import ScannedPDFDetector
 
 
 class PDFAccessibilityScanner:
@@ -23,6 +24,11 @@ class PDFAccessibilityScanner:
         self.use_verapdf = config.get("use_verapdf", True)
         self.verapdf_available = VeraPDFValidator.is_available() if self.use_verapdf else False
         self.verapdf_profile = config.get("verapdf_profile", "PDFUA-1")
+
+        # Check if OCR detection is available and should be used
+        self.detect_scanned = config.get("detect_scanned", True)
+        self.ocr_detector = ScannedPDFDetector() if self.detect_scanned else None
+        self.ocr_available = self.ocr_detector.is_available() if self.ocr_detector else False
 
     async def scan_pdf(self, pdf_path: Path, source_url: Optional[str] = None) -> Dict:
         """Scan single PDF for accessibility violations
@@ -76,6 +82,16 @@ class PDFAccessibilityScanner:
                         "failureSummary": f"Error: {str(e)}"
                     }]
                 })
+
+        # Check for scanned PDF (image-only) if OCR detection is available
+        if self.ocr_available and self.ocr_detector:
+            try:
+                scanned_violation = self.ocr_detector.get_violation_if_scanned(pdf_path)
+                if scanned_violation:
+                    violations.append(scanned_violation)
+            except Exception as e:
+                # OCR detection failed, continue with other checks
+                pass
 
         # Use Python-based checks (either as fallback or primary method)
         try:
