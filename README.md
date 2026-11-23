@@ -272,7 +272,72 @@ The PDF scanner performs the following compliance checks:
 ⏳ **Reading Order** - Requires deep structure parsing
 ⏳ **Color Contrast** - Limited without rendering PDF
 
-**Note:** For comprehensive PDF/UA validation, consider using [veraPDF](https://verapdf.org/) in addition to this tool. The scanner focuses on the most common and critical accessibility issues that can be detected programmatically.
+## Enhanced PDF Validation with verapdf
+
+The scanner includes **optional integration with verapdf**, the industry-standard PDF/UA validator developed by the PDF Association.
+
+### Why Use verapdf?
+
+**Built-in Python checks** (always available):
+- Fast, no external dependencies
+- Covers most common accessibility issues
+- Good for quick scans and CI/CD pipelines
+
+**verapdf validation** (optional, more comprehensive):
+- Industry-standard PDF/UA compliance checking
+- Validates against official ISO 14289-1 specification
+- More detailed rule coverage (~100+ validation rules)
+- Used by PDF Association and accessibility professionals
+
+### Installing verapdf
+
+**macOS (Homebrew):**
+```bash
+brew install --cask verapdf
+```
+
+**Linux:**
+```bash
+# Download latest release from https://github.com/veraPDF/veraPDF-apps/releases
+wget https://software.verapdf.org/releases/verapdf-installer.zip
+unzip verapdf-installer.zip
+./verapdf-install
+```
+
+**Windows:**
+Download installer from https://verapdf.org/software/
+
+**Verify installation:**
+```bash
+verapdf --version
+```
+
+### Using verapdf
+
+verapdf integration is **automatic** - if installed, it will be used by default.
+
+**Disable verapdf** (use Python checks only):
+```bash
+# Via config file
+echo "use_verapdf: false" >> config.yml
+accessibility-scan scan-pdf --config config.yml --file document.pdf
+```
+
+**Choose validation profile:**
+```yaml
+# config.yml
+use_verapdf: true
+verapdf_profile: "PDFUA-1"  # or "WCAG-2-1", "WCAG-2-2"
+```
+
+**Check if verapdf is being used:**
+The scan results will indicate which validator was used:
+- `"validator": "verapdf"` - verapdf was used
+- No validator field - Python-based checks were used
+
+### Fallback Behavior
+
+If verapdf fails or times out (>60s), the scanner automatically falls back to Python-based checks with no loss of functionality.
 
 ## Development
 

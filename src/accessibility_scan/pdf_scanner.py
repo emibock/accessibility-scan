@@ -8,6 +8,8 @@ import httpx
 import pikepdf
 import pdfplumber
 
+from .verapdf_validator import VeraPDFValidator
+
 
 class PDFAccessibilityScanner:
     """Scanner for PDF accessibility violations"""
@@ -16,6 +18,11 @@ class PDFAccessibilityScanner:
         self.config = config
         self.results = []
         self.max_file_size = config.get("max_file_size", 50) * 1024 * 1024  # Convert MB to bytes
+
+        # Check if verapdf is available and should be used
+        self.use_verapdf = config.get("use_verapdf", True)
+        self.verapdf_available = VeraPDFValidator.is_available() if self.use_verapdf else False
+        self.verapdf_profile = config.get("verapdf_profile", "PDFUA-1")
 
     async def scan_pdf(self, pdf_path: Path, source_url: Optional[str] = None) -> Dict:
         """Scan single PDF for accessibility violations
@@ -33,6 +40,44 @@ class PDFAccessibilityScanner:
 
         display_source = source_url or f"file://{pdf_path}"
 
+        # Try verapdf first if available and enabled
+        if self.verapdf_available:
+            try:
+                validator = VeraPDFValidator()
+                verapdf_result = await validator.validate(
+                    pdf_path,
+                    profile=self.verapdf_profile,
+                    format="json"
+                )
+
+                # If verapdf succeeded, return its results enhanced with our metadata
+                if "error" not in verapdf_result:
+                    # Add PDF metadata
+                    with pikepdf.open(pdf_path) as pdf:
+                        verapdf_result["pdf_version"] = str(pdf.pdf_version)
+                        verapdf_result["total_pages"] = len(pdf.pages)
+                        verapdf_result["is_tagged"] = self._is_tagged(pdf_path)
+
+                    return verapdf_result
+
+                # verapdf failed, fall through to Python-based checks
+            except Exception as e:
+                # verapdf failed, fall through to Python-based checks
+                violations.append({
+                    "id": "verapdf-failed",
+                    "impact": "moderate",
+                    "description": f"verapdf validation failed, using basic checks: {str(e)}",
+                    "help": "verapdf encountered an error. Results below are from basic Python-based validation.",
+                    "helpUrl": "",
+                    "tags": ["verapdf", "fallback"],
+                    "nodes": [{
+                        "html": "verapdf validation",
+                        "target": ["verapdf"],
+                        "failureSummary": f"Error: {str(e)}"
+                    }]
+                })
+
+        # Use Python-based checks (either as fallback or primary method)
         try:
             # Open PDF with pikepdf for structure analysis
             with pikepdf.open(pdf_path) as pdf:

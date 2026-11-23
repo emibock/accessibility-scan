@@ -35,6 +35,39 @@ pip install -e .
 playwright install chromium
 ```
 
+### 5. (Optional) Install verapdf for enhanced PDF validation
+
+For comprehensive, industry-standard PDF/UA validation, install verapdf:
+
+**macOS:**
+```bash
+brew install --cask verapdf
+```
+
+**Linux:**
+```bash
+wget https://software.verapdf.org/releases/verapdf-installer.zip
+unzip verapdf-installer.zip
+./verapdf-install
+```
+
+**Windows:**  
+Download from https://verapdf.org/software/
+
+**Verify:**
+```bash
+verapdf --version
+```
+
+**What verapdf provides:**
+- Industry-standard PDF/UA compliance checking (ISO 14289-1)
+- ~100+ validation rules vs. ~10 built-in checks
+- Used by PDF Association and accessibility professionals
+- Automatic integration - no configuration needed
+
+**Without verapdf:**  
+The scanner still works perfectly using built-in Python checks. verapdf is recommended for comprehensive validation but not required.
+
 ## Usage
 
 ### Web UI (Recommended for beginners)

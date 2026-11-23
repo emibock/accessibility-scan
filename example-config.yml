@@ -26,3 +26,19 @@ authentication:
 
 # Browser settings
 headless: true
+
+# PDF Scanning settings (optional)
+# These only apply when using scan-pdf command
+
+# Use verapdf for comprehensive PDF/UA validation (if installed)
+# Default: true (will use verapdf if available, fall back to Python checks if not)
+use_verapdf: true
+
+# verapdf validation profile
+# Options: PDFUA-1, WCAG-2-1, WCAG-2-2
+# Default: PDFUA-1
+verapdf_profile: "PDFUA-1"
+
+# Maximum PDF file size for remote downloads (MB)
+# Default: 50
+max_file_size: 50
