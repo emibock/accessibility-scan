@@ -15,7 +15,7 @@ All notable changes to this project will be documented in this file.
 - Detailed remediation guidance with multi-tool instructions
 - Same export formats as web scanning (CSV, JSON, Markdown, Jira tickets)
 
-#### PDF Accessibility Checks (10 automated)
+#### PDF Accessibility Checks (11 automated)
 1. **Tagged Structure** (CRITICAL) - Verifies PDF has proper accessibility tags
 2. **Document Language** (SERIOUS) - Checks /Lang property is set
 3. **Document Title** (SERIOUS) - Validates title metadata and DisplayDocTitle
@@ -23,9 +23,10 @@ All notable changes to this project will be documented in this file.
 5. **Heading Hierarchy** (MODERATE) - Validates H1→H2→H3 progression, no skipped levels
 6. **Form Field Labels** (SERIOUS) - Checks all AcroForm fields have TU/T properties
 7. **Bookmarks/TOC** (MODERATE) - Validates Outlines with page-based recommendations
-8. **Images** (SERIOUS) - Detects images and flags for manual alt text verification
-9. **Table Detection** (MODERATE) - Visual detection as fallback when not in structure tree
-10. **Document Structure** (varies) - Additional metadata and structure validation
+8. **Image Alt Text** (SERIOUS) - Verifies Figure tags have /Alt property in structure tree
+9. **Generic Alt Text** (MODERATE) - Detects non-descriptive alt text (filenames, "image", etc.)
+10. **Table Detection** (MODERATE) - Visual detection as fallback when not in structure tree
+11. **Document Structure** (varies) - Additional metadata and structure validation
 
 #### Enhanced Violation Reports
 Each violation now includes:
@@ -148,7 +149,42 @@ detect_scanned: true  # Default: true (auto-detect if available)
 - **Graceful error handling** - Falls back to detection-only on parse errors
 - **Async scanning** - Uses asyncio for efficient multi-PDF processing
 
+#### Enhanced Image Alt Text Checking
+- **Structure tree verification**: Actually checks if Figure tags have /Alt property
+- **Generic alt text detection**: Flags non-descriptive patterns (filenames, "image", etc.)
+- **Two severity levels**: Missing alt text (SERIOUS) vs Generic alt text (MODERATE)
+- **Specific violations**: Lists exact figures with issues, not bulk "manual review"
+- **Shared utility module**: Reusable pattern detection for web and PDF scanners
+
+**Before:**
+```
+⚠️ PDF contains 15 images - manual review needed
+```
+
+**After:**
+```
+✗ SERIOUS: 3 of 15 images lack alternative text
+  Missing: Figure 1, Figure 3, Figure 5
+
+✗ MODERATE: 2 images have generic alt text
+  Figure 2: "image.jpg" (uses filename)
+  Figure 4: "photo1" (generic label)
+```
+
+**Generic Patterns Detected:**
+- Filenames: "image.jpg", "IMG_1234.png", "photo.gif"
+- Generic words: "image", "photo", "graphic", "figure"
+- Placeholders: "alt text", "todo", "placeholder"
+- Very short: "1", "a", "2"
+- URLs or file paths
+
+**Shared Module (alt_text_checker.py):**
+- `is_generic_alt_text()` - Detects bad patterns
+- `get_alt_text_quality_message()` - Explains the issue
+- `get_better_alt_text_examples()` - Context-specific guidance
+
 ### Changed
+- **Enhanced PDF image checking** from placeholder to structure tree analysis
 - Updated README with PDF scanning documentation
 - Enhanced exporter to handle both web and PDF results
 - Modified history template to show scan type and appropriate targets
