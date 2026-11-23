@@ -13,11 +13,12 @@ class ResultExporter:
 
     SEVERITY_ORDER = {"critical": 4, "serious": 3, "moderate": 2, "minor": 1}
 
-    def __init__(self, results: List[Dict], output_dir: Path, min_severity: str = None):
+    def __init__(self, results: List[Dict], output_dir: Path, min_severity: str = None, is_pdf: bool = False):
         self.results = results
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.min_severity = min_severity.lower() if min_severity else None
+        self.is_pdf = is_pdf
 
     def _should_include_violation(self, violation: Dict) -> bool:
         """Check if violation meets minimum severity threshold"""
@@ -44,16 +45,30 @@ class ResultExporter:
         with open(csv_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
 
-            # Header
-            writer.writerow([
-                'Summary',
-                'Description',
-                'Page URL',
-                'Severity',
-                'WCAG Criterion',
-                'Element',
-                'Help URL'
-            ])
+            # Header - add PDF-specific columns if scanning PDFs
+            if self.is_pdf:
+                writer.writerow([
+                    'Summary',
+                    'Description',
+                    'Source',
+                    'File Name',
+                    'PDF Version',
+                    'Page Count',
+                    'Severity',
+                    'WCAG Criterion',
+                    'Element',
+                    'Help URL'
+                ])
+            else:
+                writer.writerow([
+                    'Summary',
+                    'Description',
+                    'Page URL',
+                    'Severity',
+                    'WCAG Criterion',
+                    'Element',
+                    'Help URL'
+                ])
 
             # Violations
             for page_result in self.results:
@@ -64,15 +79,31 @@ class ResultExporter:
                         continue
 
                     for node in violation.get('nodes', []):
-                        writer.writerow([
-                            f"[A11y] {violation['id']}: {violation['description'][:50]}...",
-                            violation['description'],
-                            url,
-                            violation['impact'].upper() if violation.get('impact') else 'MODERATE',
-                            ', '.join(violation.get('tags', [])),
-                            node.get('html', '')[:100],
-                            violation.get('helpUrl', '')
-                        ])
+                        if self.is_pdf:
+                            # PDF-specific row format
+                            writer.writerow([
+                                f"[PDF] {violation['id']}: {violation['description'][:50]}...",
+                                violation['description'],
+                                url,
+                                page_result.get('file_name', ''),
+                                page_result.get('pdf_version', ''),
+                                page_result.get('total_pages', ''),
+                                violation['impact'].upper() if violation.get('impact') else 'MODERATE',
+                                ', '.join(violation.get('tags', [])),
+                                node.get('html', '')[:100],
+                                violation.get('helpUrl', '')
+                            ])
+                        else:
+                            # Web page row format
+                            writer.writerow([
+                                f"[A11y] {violation['id']}: {violation['description'][:50]}...",
+                                violation['description'],
+                                url,
+                                violation['impact'].upper() if violation.get('impact') else 'MODERATE',
+                                ', '.join(violation.get('tags', [])),
+                                node.get('html', '')[:100],
+                                violation.get('helpUrl', '')
+                            ])
 
         return csv_path
 
@@ -112,14 +143,23 @@ class ResultExporter:
         md_path = self.output_dir / "violations.md"
 
         with open(md_path, 'w', encoding='utf-8') as f:
-            f.write("# Accessibility Scan Results\n\n")
+            if self.is_pdf:
+                f.write("# PDF Accessibility Scan Results\n\n")
+            else:
+                f.write("# Accessibility Scan Results\n\n")
+
             f.write(f"**Scan Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
             total_violations = sum(
                 len(r.get('violations', []))
                 for r in self.results
             )
-            f.write(f"**Total Pages:** {len(self.results)}\n")
+
+            if self.is_pdf:
+                f.write(f"**Total PDFs:** {len(self.results)}\n")
+            else:
+                f.write(f"**Total Pages:** {len(self.results)}\n")
+
             f.write(f"**Total Violations:** {total_violations}\n\n")
 
             f.write("---\n\n")
@@ -134,23 +174,53 @@ class ResultExporter:
                 if not violations:
                     continue
 
-                f.write(f"## {url}\n\n")
-                f.write(f"**Violations:** {len(violations)}\n\n")
+                if self.is_pdf:
+                    file_name = page_result.get('file_name', 'Unknown')
+                    pdf_version = page_result.get('pdf_version', 'Unknown')
+                    total_pages = page_result.get('total_pages', 'Unknown')
+                    is_tagged = page_result.get('is_tagged', False)
+
+                    f.write(f"## PDF: {file_name}\n\n")
+                    f.write(f"**Source:** {url}\n")
+                    f.write(f"**PDF Version:** {pdf_version}\n")
+                    f.write(f"**Pages:** {total_pages}\n")
+                    f.write(f"**Tagged:** {'✓ Yes' if is_tagged else '✗ No'}\n\n")
+                    f.write(f"**Violations:** {len(violations)}\n\n")
+                else:
+                    f.write(f"## {url}\n\n")
+                    f.write(f"**Violations:** {len(violations)}\n\n")
 
                 for violation in violations:
                     impact = violation.get('impact', 'moderate').upper()
                     f.write(f"### [{impact}] {violation['id']}\n\n")
                     f.write(f"**Description:** {violation['description']}\n\n")
-                    f.write(f"**WCAG:** {', '.join(violation.get('tags', []))}\n\n")
-                    f.write(f"**Help:** {violation.get('helpUrl', 'N/A')}\n\n")
 
+                    # Include detailed help/remediation text if available
+                    help_text = violation.get('help', '')
+                    if help_text and len(help_text) > 100:  # Only show if it's detailed
+                        f.write(f"\n**How to Fix:**\n\n")
+                        # Format the help text nicely
+                        for line in help_text.split('\n'):
+                            f.write(f"{line}\n")
+                        f.write("\n")
+
+                    f.write(f"**WCAG Criteria:** {', '.join(violation.get('tags', []))}\n\n")
+                    f.write(f"**Reference:** {violation.get('helpUrl', 'N/A')}\n\n")
+
+                    # Show detailed failure information from nodes
                     f.write(f"**Affected Elements:** {len(violation.get('nodes', []))}\n\n")
 
                     for i, node in enumerate(violation.get('nodes', [])[:3], 1):
-                        f.write(f"{i}. `{node.get('html', '')[:80]}...`\n")
+                        html_snippet = node.get('html', '')[:100]
+                        f.write(f"{i}. Element: `{html_snippet}...`\n")
+
+                        # Include failure summary if available
+                        failure_summary = node.get('failureSummary', '')
+                        if failure_summary:
+                            f.write(f"   - **Issue:** {failure_summary}\n")
 
                     if len(violation.get('nodes', [])) > 3:
-                        f.write(f"   _...and {len(violation['nodes']) - 3} more_\n")
+                        f.write(f"\n   _...and {len(violation['nodes']) - 3} more elements_\n")
 
                     f.write("\n---\n\n")
 

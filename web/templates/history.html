@@ -15,7 +15,8 @@
 
         <main>
             <div class="form-actions" style="margin-bottom: 2rem;">
-                <a href="/new" class="btn-primary">+ New Scan</a>
+                <a href="/new" class="btn-primary">+ New Web Scan</a>
+                <a href="/new-pdf" class="btn-primary" style="margin-left: 1rem; background-color: #d32f2f;">+ New PDF Scan</a>
             </div>
 
             {% if scans %}
@@ -26,8 +27,9 @@
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>URL</th>
-                            <th>Pages</th>
+                            <th>Type</th>
+                            <th>Target</th>
+                            <th>Pages/PDFs</th>
                             <th>Violations</th>
                             <th>Status</th>
                             <th>Actions</th>
@@ -37,7 +39,20 @@
                         {% for scan in scans %}
                         <tr>
                             <td>{{ scan.completed[:10] if scan.completed else scan.started[:10] }}</td>
-                            <td class="url-cell">{{ scan.config.start_url }}</td>
+                            <td>
+                                {% if scan.scan_type == 'pdf' %}
+                                <span style="background: #d32f2f; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">PDF</span>
+                                {% else %}
+                                <span style="background: #1976d2; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">WEB</span>
+                                {% endif %}
+                            </td>
+                            <td class="url-cell">
+                                {% if scan.scan_type == 'pdf' %}
+                                {{ scan.total_pdfs }} PDF(s)
+                                {% else %}
+                                {{ scan.config.start_url if scan.config else 'N/A' }}
+                                {% endif %}
+                            </td>
                             <td>{{ scan.summary.total_pages if scan.summary else '-' }}</td>
                             <td>
                                 {% if scan.summary %}

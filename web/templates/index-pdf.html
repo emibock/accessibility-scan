@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Accessibility Scanner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>PDF Accessibility Scanner</h1>
+            <p>PDF/UA compliance checking exported to CSV, JSON, and Markdown</p>
+            <nav style="margin-top: 1rem;">
+                <a href="/" style="color: #1976d2;">← Back to History</a> |
+                <a href="/new" style="color: #1976d2;">Web Scan</a>
+            </nav>
+        </header>
+
+        <main>
+            <form id="pdfScanForm" enctype="multipart/form-data">
+                <section class="form-section">
+                    <h2>Upload PDF or Provide URL</h2>
+
+                    <div class="form-group">
+                        <label for="pdf_file">Upload PDF File</label>
+                        <input type="file" id="pdf_file" name="pdf_file" accept=".pdf">
+                        <small>Select a PDF file from your computer</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="pdf_url">Or Enter PDF URL</label>
+                        <input type="url" id="pdf_url" name="pdf_url"
+                               placeholder="https://example.com/document.pdf">
+                        <small>Direct link to a PDF file</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="pdf_urls">Or Batch URLs (one per line)</label>
+                        <textarea id="pdf_urls" name="pdf_urls" rows="5"
+                                  placeholder="https://example.com/doc1.pdf&#10;https://example.com/doc2.pdf"></textarea>
+                        <small>Scan multiple PDFs at once</small>
+                    </div>
+                </section>
+
+                <section class="form-section" style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 1rem;">
+                    <h3 style="margin-top: 0; color: #856404;">What We Check</h3>
+                    <ul style="margin-bottom: 0; color: #856404;">
+                        <li>Tagged PDF structure (required for screen readers)</li>
+                        <li>Document language and title metadata</li>
+                        <li>Form field labels and accessibility</li>
+                        <li>Bookmarks/TOC for navigation (documents >10 pages)</li>
+                        <li>Images, tables, and content structure (manual review flagged)</li>
+                    </ul>
+                </section>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Scan PDF(s)</button>
+                </div>
+            </form>
+        </main>
+    </div>
+
+    <script>
+        // Form submission
+        document.getElementById('pdfScanForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Validate that at least one input method is provided
+            const fileInput = document.getElementById('pdf_file');
+            const urlInput = document.getElementById('pdf_url');
+            const urlsInput = document.getElementById('pdf_urls');
+
+            if (!fileInput.files.length && !urlInput.value.trim() && !urlsInput.value.trim()) {
+                alert('Please upload a PDF file or provide a URL.');
+                return;
+            }
+
+            const formData = new FormData(e.target);
+            const response = await fetch('/start-pdf-scan', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                alert(`Error: ${error.error || 'Unknown error'}`);
+                return;
+            }
+
+            const data = await response.json();
+            window.location.href = `/results/${data.scan_id}`;
+        });
+    </script>
+</body>
+</html>

@@ -12,6 +12,7 @@ import yaml
 
 from .crawler import Crawler
 from .scanner import AccessibilityScanner
+from .pdf_scanner import PDFAccessibilityScanner
 from .exporter import ResultExporter
 
 
@@ -53,6 +54,12 @@ def new_scan():
     return render_template("index.html")
 
 
+@app.route("/new-pdf")
+def new_pdf_scan():
+    """New PDF scan form"""
+    return render_template("index-pdf.html")
+
+
 @app.route("/rerun/<scan_id>")
 def rerun_scan(scan_id):
     """Prefill form with previous scan config"""
@@ -64,7 +71,15 @@ def rerun_scan(scan_id):
     with open(metadata_path) as f:
         metadata = json.load(f)
 
-    return render_template("index.html", config=metadata.get('config', {}))
+    # Route to appropriate scan form based on type
+    scan_type = metadata.get('scan_type', 'web')
+    if scan_type == 'pdf':
+        # PDF scans - for now just redirect to new PDF form
+        # (could enhance to prefill with previous PDF URLs in future)
+        return render_template("index-pdf.html")
+    else:
+        # Web scans - prefill with config
+        return render_template("index.html", config=metadata.get('config', {}))
 
 
 @app.route("/start-scan", methods=["POST"])
@@ -109,6 +124,60 @@ def start_scan():
     # Start scan in background
     do_crawl = request.form.get("crawl") == "on"
     thread = Thread(target=run_scan, args=(scan_id, config, do_crawl))
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({"scan_id": scan_id})
+
+
+@app.route("/start-pdf-scan", methods=["POST"])
+def start_pdf_scan():
+    """Start new PDF scan"""
+    scan_id = uuid.uuid4().hex[:8]
+
+    # Handle file upload or URL
+    pdf_sources = []
+
+    # File upload
+    if 'pdf_file' in request.files:
+        pdf_file = request.files['pdf_file']
+        if pdf_file.filename:
+            # Save uploaded file
+            upload_dir = REPORTS_DIR / scan_id / "uploads"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            upload_path = upload_dir / pdf_file.filename
+            pdf_file.save(upload_path)
+            pdf_sources.append({"path": str(upload_path)})
+
+    # URL
+    pdf_url = request.form.get("pdf_url", "").strip()
+    if pdf_url:
+        pdf_sources.append({"url": pdf_url})
+
+    # Batch URLs (newline-separated)
+    pdf_urls = request.form.get("pdf_urls", "").strip()
+    if pdf_urls:
+        for line in pdf_urls.split('\n'):
+            line = line.strip()
+            if line and (line.startswith('http://') or line.startswith('https://')):
+                pdf_sources.append({"url": line})
+
+    if not pdf_sources:
+        return jsonify({"error": "No PDF files or URLs provided"}), 400
+
+    # Init scan state
+    scans[scan_id] = {
+        "status": "running",
+        "started": datetime.now().isoformat(),
+        "progress": 0,
+        "message": "Starting PDF scan...",
+        "scan_type": "pdf",
+        "total_pdfs": len(pdf_sources),
+        "pdfs_scanned": 0,
+    }
+
+    # Start scan in background
+    thread = Thread(target=run_pdf_scan, args=(scan_id, pdf_sources))
     thread.daemon = True
     thread.start()
 
@@ -285,6 +354,82 @@ def run_scan(scan_id: str, config: dict, crawl: bool):
                 "crawl": crawl,
                 "wcag_level": config.get("wcag_level", "2.2"),
             }
+        }
+
+        metadata_path = output_dir / "metadata.json"
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+
+
+def run_pdf_scan(scan_id: str, pdf_sources: list):
+    """Run PDF scan in background thread"""
+    try:
+        scans[scan_id]["message"] = f"Scanning {len(pdf_sources)} PDF(s)..."
+        scans[scan_id]["progress"] = 10
+
+        # Progress callback
+        def update_scan_progress(pdfs_done: int, total: int):
+            scans[scan_id]["pdfs_scanned"] = pdfs_done
+            # Progress: 10-90% for scanning phase
+            scan_progress = int(10 + (pdfs_done / total) * 80)
+            scans[scan_id]["progress"] = scan_progress
+            scans[scan_id]["message"] = f"Scanning PDF {pdfs_done} of {total}..."
+
+        # Scan
+        config = {}  # PDF scanner config (can add settings later)
+        scanner = PDFAccessibilityScanner(config)
+        results = asyncio.run(scanner.scan(pdf_sources, progress_callback=update_scan_progress))
+
+        # Export
+        scans[scan_id]["message"] = "Generating reports..."
+        scans[scan_id]["progress"] = 90
+
+        output_dir = REPORTS_DIR / scan_id
+        exporter = ResultExporter(results, output_dir, is_pdf=True)
+        exporter.export_all()
+        summary = exporter.get_summary()
+
+        # Complete
+        scans[scan_id].update({
+            "status": "complete",
+            "progress": 100,
+            "message": "PDF scan complete!",
+            "completed": datetime.now().isoformat(),
+            "summary": summary
+        })
+
+        # Save metadata for history
+        metadata = {
+            "status": "complete",
+            "scan_type": "pdf",
+            "started": scans[scan_id]["started"],
+            "completed": datetime.now().isoformat(),
+            "summary": summary,
+            "total_pdfs": len(pdf_sources),
+        }
+
+        metadata_path = output_dir / "metadata.json"
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+
+    except Exception as e:
+        scans[scan_id].update({
+            "status": "failed",
+            "message": f"Error: {str(e)}",
+            "error": str(e)
+        })
+
+        # Save failed metadata
+        output_dir = REPORTS_DIR / scan_id
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        metadata = {
+            "status": "failed",
+            "scan_type": "pdf",
+            "started": scans[scan_id].get("started", datetime.now().isoformat()),
+            "completed": datetime.now().isoformat(),
+            "error": str(e),
+            "total_pdfs": len(pdf_sources),
         }
 
         metadata_path = output_dir / "metadata.json"

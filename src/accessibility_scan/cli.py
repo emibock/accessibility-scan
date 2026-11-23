@@ -10,6 +10,7 @@ from rich.progress import Progress
 
 from .crawler import Crawler
 from .scanner import AccessibilityScanner
+from .pdf_scanner import PDFAccessibilityScanner
 from .exporter import ResultExporter
 
 
@@ -177,6 +178,84 @@ def validate(config_file):
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         sys.exit(1)
+
+
+@main.command()
+@click.option('--file', 'pdf_file', type=click.Path(exists=True), help='Local PDF file to scan')
+@click.option('--url', 'pdf_url', help='URL to PDF file')
+@click.option('--batch', type=click.Path(exists=True), help='Text file with list of PDF paths/URLs (one per line)')
+@click.option('--output', type=click.Path(), default='./pdf-scan-results', help='Output directory')
+@click.option('--min-severity', type=click.Choice(['minor', 'moderate', 'serious', 'critical'], case_sensitive=False), help='Minimum severity to include in results')
+def scan_pdf(pdf_file, pdf_url, batch, output, min_severity):
+    """Scan PDF files for accessibility issues"""
+
+    if not pdf_file and not pdf_url and not batch:
+        console.print("[red]Error: Provide --file, --url, or --batch[/red]")
+        sys.exit(1)
+
+    # Build list of PDF sources
+    pdf_sources = []
+
+    if pdf_file:
+        pdf_sources.append({"path": pdf_file})
+
+    if pdf_url:
+        pdf_sources.append({"url": pdf_url})
+
+    if batch:
+        with open(batch) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                # Determine if URL or file path
+                if line.startswith('http://') or line.startswith('https://'):
+                    pdf_sources.append({"url": line})
+                else:
+                    pdf_sources.append({"path": line})
+
+    asyncio.run(_run_pdf_scan(pdf_sources, output, min_severity))
+
+
+async def _run_pdf_scan(pdf_sources: list, output_dir: str, min_severity: str = None):
+    """Run PDF scan async"""
+    console.print("[bold blue]Starting PDF accessibility scan...[/bold blue]")
+    console.print(f"[cyan]Scanning {len(pdf_sources)} PDF(s)...[/cyan]")
+
+    if min_severity:
+        console.print(f"[yellow]Filtering: minimum severity = {min_severity.upper()}[/yellow]")
+
+    # Scan PDFs
+    config = {}  # Can add PDF-specific config here
+    scanner = PDFAccessibilityScanner(config)
+
+    with Progress() as progress:
+        task = progress.add_task("[cyan]Scanning PDFs...", total=len(pdf_sources))
+
+        def update_progress(pdfs_done: int, total: int):
+            progress.update(task, completed=pdfs_done)
+
+        results = await scanner.scan(pdf_sources, progress_callback=update_progress)
+
+    # Export
+    console.print("[cyan]Exporting results...[/cyan]")
+    exporter = ResultExporter(results, Path(output_dir), min_severity=min_severity, is_pdf=True)
+    exporter.export_all()
+
+    # Summary
+    summary = exporter.get_summary()
+    console.print("\n[bold green]PDF Scan Complete![/bold green]")
+    console.print(f"PDFs scanned: {summary['total_pages']}")
+    console.print(f"Total violations: {summary['total_violations']}")
+    console.print(f"\nBy severity:")
+    for severity, count in summary['by_severity'].items():
+        console.print(f"  {severity.upper()}: {count}")
+
+    console.print(f"\n[bold]Results saved to:[/bold] {output_dir}")
+    console.print(f"  - violations.csv (Jira import)")
+    console.print(f"  - violations.json (full data)")
+    console.print(f"  - violations.md (readable report)")
+    console.print(f"  - jira-tickets.md (consolidated tickets)")
 
 
 @main.command()
