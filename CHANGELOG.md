@@ -85,11 +85,60 @@ verapdf_profile: "PDFUA-1" # or "WCAG-2-1", "WCAG-2-2"
 - verapdf timeout (>60s) → Python checks (automatic)
 - verapdf error → Python checks (with warning)
 
+#### Optional Scanned PDF Detection (OCR)
+- **Automatic detection**: Identifies image-only PDFs using OCR comparison
+- **Critical barrier**: Scanned PDFs appear completely blank to screen readers
+- **Detailed analysis**: Compares embedded text vs OCR-detected text
+- **Confidence scoring**: Reports detection confidence and sample details
+- **Installation**: Optional - `pip install -e ".[ocr]"` + `brew install tesseract`
+
+**How OCR Detection Works:**
+1. Extracts embedded text from PDF (what screen readers see)
+2. Renders PDF pages as images at 150 DPI
+3. Runs Tesseract OCR on images (what humans see)
+4. Compares: OCR >> embedded = scanned PDF
+5. Reports confidence level and statistics
+
+**Detection Criteria:**
+- Embedded text < 10% of OCR-detected text = SCANNED
+- OCR must find >100 characters (avoid false positives)
+- Samples first, middle, last pages by default
+- Confidence score based on text ratio
+
+**Configuration Options:**
+```yaml
+detect_scanned: true  # Default: true (auto-detect if available)
+```
+
+**Violation Output:**
+```
+✗ CRITICAL: pdf-scanned-document
+  Embedded text: 45 characters
+  OCR detected: 2,847 characters  
+  Pages sampled: 3 of 15
+  Confidence: 95%
+```
+
+**Remediation Guidance:**
+- Adobe Acrobat Pro: Scan & OCR → Add Tags → Full accessibility check
+- ABBYY FineReader: Professional OCR + PDF/UA export
+- Recreate from source document (best quality)
+- Manual retyping for short documents
+
+**Fallback Behavior:**
+- Pillow not installed → OCR detection disabled
+- pytesseract not installed → OCR detection disabled
+- Tesseract binary not found → OCR detection disabled
+- All other PDF checks run normally regardless
+
 #### Dependencies Added
 - `pikepdf>=9.0.0` - PDF structure tree parsing and analysis
 - `pdfplumber>=0.11.0` - Content extraction and table detection
 - `httpx>=0.27.0` - Async HTTP client for downloading remote PDFs
 - `verapdf` (optional) - Industry-standard PDF/UA validator
+- `Pillow>=10.0.0` (optional: "ocr" extra) - Image processing for OCR
+- `pytesseract>=0.3.10` (optional: "ocr" extra) - Tesseract OCR wrapper
+- `tesseract` (optional system install) - OCR engine for scanned PDF detection
 
 #### Technical Implementation
 - **Structure tree analysis** - Recursively parses PDF accessibility layer
