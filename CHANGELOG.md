@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added - PDF Accessibility Scanning
 
-**Major Feature:** Comprehensive PDF/UA compliance checking with structure tree analysis
+**Major Feature:** Comprehensive PDF/UA compliance checking with structure tree analysis and optional verapdf integration
 
 #### Core Features
 - PDF scanning via CLI and Web UI
@@ -60,10 +60,36 @@ accessibility-scan scan-pdf --file report.pdf --min-severity serious
 - Target column adapts to scan type (URL for web, "X PDF(s)" for PDF)
 - Rerun button routes to correct form type
 
+#### Optional verapdf Integration
+- **Automatic detection**: Uses verapdf if installed, graceful fallback if not
+- **Industry-standard validation**: ISO 14289-1 PDF/UA compliance (~100+ rules)
+- **Zero configuration**: Works out of the box when verapdf is available
+- **Configurable**: Can disable or change validation profile
+- **Robust fallback**: Automatically uses Python checks on timeout/error
+- **Installation**: Optional - `brew install --cask verapdf` (macOS)
+
+**verapdf Benefits:**
+- Official PDF/UA validator by PDF Association
+- More comprehensive than built-in checks (100+ vs 10 rules)
+- Supports PDFUA-1, WCAG-2-1, WCAG-2-2 profiles
+- Used by accessibility professionals worldwide
+
+**Configuration Options:**
+```yaml
+use_verapdf: true          # Default: true (auto-detect)
+verapdf_profile: "PDFUA-1" # or "WCAG-2-1", "WCAG-2-2"
+```
+
+**Fallback Behavior:**
+- verapdf not installed → Python checks (seamless)
+- verapdf timeout (>60s) → Python checks (automatic)
+- verapdf error → Python checks (with warning)
+
 #### Dependencies Added
 - `pikepdf>=9.0.0` - PDF structure tree parsing and analysis
 - `pdfplumber>=0.11.0` - Content extraction and table detection
 - `httpx>=0.27.0` - Async HTTP client for downloading remote PDFs
+- `verapdf` (optional) - Industry-standard PDF/UA validator
 
 #### Technical Implementation
 - **Structure tree analysis** - Recursively parses PDF accessibility layer
