@@ -38,6 +38,12 @@ class AccessibilityScanner:
         # due to ads, analytics, etc. "load" waits for DOMContentLoaded + all resources
         await page.goto(url, wait_until="load", timeout=30000)
 
+        # Optional settle delay for SPAs (React, Vue, Angular, Backstage, etc.)
+        # Some client-rendered apps haven't painted content immediately after "load"
+        settle_ms = self.config.get("settle_ms", 0)
+        if settle_ms > 0:
+            await asyncio.sleep(settle_ms / 1000.0)
+
         axe = Axe()
 
         # Configure axe to run only rules for the specified WCAG level
@@ -217,25 +223,43 @@ Ensures screen reader users get meaningful image descriptions, not useless gener
             return results
 
     async def _authenticate(self, page: Page, auth: Dict):
-        """Handle authentication"""
+        """Handle authentication
+
+        Supports both credential-based and click-only authentication:
+        - Traditional: username + password + submit button
+        - SSO/Guest: just click a button (no credentials)
+        """
         login_url = auth.get("login_url")
         username = auth.get("username")
         password = auth.get("password")
+        submit_sel = auth.get("submit_selector")
 
-        # Skip auth if no login URL or no credentials
-        if not login_url or not username or not password:
+        # Skip auth if no login URL
+        if not login_url:
+            return
+
+        # Must have either credentials OR a submit selector to click
+        has_credentials = username and password
+        has_submit = submit_sel is not None
+
+        if not has_credentials and not has_submit:
             return
 
         await page.goto(login_url)
 
-        # Fill credentials - use defaults if selectors empty
-        username_sel = auth.get("username_selector") or "input[name='username']"
-        password_sel = auth.get("password_selector") or "input[name='password']"
-        submit_sel = auth.get("submit_selector") or "button[type='submit']"
+        # Fill credentials only if provided (supports click-only auth)
+        if has_credentials:
+            username_sel = auth.get("username_selector") or "input[name='username']"
+            password_sel = auth.get("password_selector") or "input[name='password']"
 
-        await page.fill(username_sel, auth["username"])
-        await page.fill(password_sel, auth["password"])
-        await page.click(submit_sel)
+            await page.fill(username_sel, username)
+            await page.fill(password_sel, password)
+
+        # Click submit if selector provided (required for both credential and click-only)
+        if has_submit:
+            # Use provided submit selector or default
+            submit_selector = submit_sel or "button[type='submit']"
+            await page.click(submit_selector)
 
         # Wait for success indicator
         success = auth.get("success_indicator")

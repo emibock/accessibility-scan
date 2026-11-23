@@ -140,14 +140,32 @@ def validate(config_file):
         elif max_pages is not None and max_pages > 500:
             warnings.append(f"max_pages is {max_pages} (>500) - scan may take significant time and resources")
 
+        # settle_ms validation (SPA support)
+        settle_ms = config.get('settle_ms')
+        if settle_ms is not None:
+            if not isinstance(settle_ms, int) or settle_ms < 0:
+                errors.append("settle_ms must be a non-negative integer (milliseconds)")
+            elif settle_ms > 10000:
+                warnings.append(f"settle_ms is {settle_ms}ms (>10s) - very long delay before scanning")
+
         # Auth validation
         auth = config.get('authentication')
         if auth:
             if not auth.get('login_url'):
                 warnings.append("authentication.login_url not set")
-            if not auth.get('username'):
+
+            # Credentials are now optional for click-only auth
+            has_credentials = auth.get('username') and auth.get('password')
+            has_submit = auth.get('submit_selector')
+
+            if not has_credentials and not has_submit:
+                warnings.append("authentication needs either username+password OR submit_selector for click-only auth")
+            elif not has_credentials and has_submit:
+                # Click-only auth is valid, no warning needed
+                pass
+            elif has_credentials and not auth.get('username'):
                 warnings.append("authentication.username not set")
-            if not auth.get('password'):
+            elif has_credentials and not auth.get('password'):
                 warnings.append("authentication.password not set")
 
         # Report results
@@ -169,8 +187,11 @@ def validate(config_file):
         console.print(f"  Start URL: {config.get('start_url')}")
         console.print(f"  Max pages: {config.get('max_pages', 'unlimited')}")
         console.print(f"  Headless: {config.get('headless', True)}")
+        if settle_ms:
+            console.print(f"  Settle delay: {settle_ms}ms (SPA support)")
         if auth:
-            console.print(f"  Authentication: configured")
+            auth_type = "click-only" if not auth.get('username') else "credentials"
+            console.print(f"  Authentication: {auth_type}")
 
     except yaml.YAMLError as e:
         console.print(f"[bold red]YAML parsing error:[/bold red]\n{e}")

@@ -4,6 +4,72 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added - User-Requested Features
+
+#### settle_ms: Post-Load Delay for SPAs
+
+**Problem:** Client-rendered apps (React, Vue, Angular, Backstage) often haven't painted content when the `load` event fires, causing false positives like "missing heading" when the heading exists in the rendered DOM.
+
+**Solution:** Optional `settle_ms` configuration delays axe scan after page load to allow SPAs to render.
+
+```yaml
+settle_ms: 4000  # Wait 4 seconds for React to render
+```
+
+**Use cases:**
+- React/Vue/Angular applications
+- Backstage or client-rendered dashboards
+- Any SPA with false positives for elements that exist
+
+**Typical values:**
+- Fast SPAs: 2000ms
+- Complex dashboards: 4000-5000ms
+- Server-rendered sites: 0ms (default, no delay)
+
+**Implementation:**
+- Default: 0 (no delay, backwards compatible)
+- Configurable per-scan in config.yml
+- Uses `asyncio.sleep()` after `page.goto()`
+
+---
+
+#### Click-Only Authentication (SSO, Guest Login)
+
+**Problem:** Previous authentication required username + password, so SSO logins, guest logins, and "Continue as Guest" buttons couldn't be automated.
+
+**Solution:** Made `username` and `password` optional. If omitted, scanner just clicks the submit button without filling credentials.
+
+**Traditional auth (unchanged):**
+```yaml
+authentication:
+  login_url: https://example.com/login
+  username: ${ENV:USERNAME}
+  password: ${ENV:PASSWORD}
+  submit_selector: button[type='submit']
+  success_indicator: .user-menu
+```
+
+**Click-only auth (new):**
+```yaml
+authentication:
+  login_url: https://example.com/login
+  submit_selector: button[data-guest-login]  # No credentials needed
+  success_indicator: .user-menu
+```
+
+**Use cases:**
+- SSO (Google, GitHub, SAML) - "Login with Google" button
+- Guest/demo logins - "Continue as Guest"
+- "Skip login" or "Browse without account" flows
+
+**Implementation:**
+- Username and password now optional (not required)
+- Form fields only filled if credentials provided
+- Submit button always clicked if `submit_selector` given
+- Fully backwards compatible
+
+---
+
 ### Added - Four New Quick Win Automation Checks
 
 Enhanced both web and PDF scanners with four additional automated checks that catch common accessibility issues:

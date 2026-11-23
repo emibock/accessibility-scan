@@ -8,10 +8,21 @@ max_pages: 50
 # Default: 2.2 (recommended)
 wcag_level: "2.2"
 
+# Post-load settle delay for SPAs (milliseconds)
+# React, Vue, Angular, Backstage, and other client-rendered apps may need time to paint
+# after the "load" event before axe can scan the actual rendered content.
+# Default: 0 (no delay)
+# Recommended for SPAs: 2000-5000ms
+settle_ms: 0
+
 # Authentication (optional - remove if not needed)
+# Supports two modes:
+#   1. Traditional: username + password + submit button
+#   2. Click-only: just submit button (SSO, guest login, "Continue as Guest")
 authentication:
   login_url: https://example.com/login
 
+  # TRADITIONAL AUTH: Provide username and password
   # Use environment variables for credentials
   username: ${ENV:USERNAME}
   password: ${ENV:PASSWORD}
@@ -23,6 +34,12 @@ authentication:
 
   # Element visible after successful login
   success_indicator: .user-menu
+
+# CLICK-ONLY AUTH EXAMPLE (SSO, guest login):
+# authentication:
+#   login_url: https://example.com/login
+#   submit_selector: button[data-guest-login]  # Just click this button, no credentials
+#   success_indicator: .user-menu
 
 # Browser settings
 headless: true

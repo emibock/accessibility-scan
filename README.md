@@ -106,7 +106,13 @@ max_pages: 50
 # Default: 2.2 (recommended)
 wcag_level: "2.2"
 
+# Post-load delay for SPAs (milliseconds)
+# React, Vue, Angular, Backstage need time to render after "load" event
+# Default: 0 (no delay). Recommended for SPAs: 2000-5000ms
+settle_ms: 0
+
 # Authentication (optional)
+# Supports traditional (username + password) and click-only (SSO, guest)
 authentication:
   login_url: https://example.com/login
   username: ${ENV:USERNAME}
@@ -121,6 +127,47 @@ headless: true
 ```
 
 Environment variables with `${ENV:VAR_NAME}` are expanded automatically.
+
+### SPA Support (settle_ms)
+
+Client-rendered apps (React, Vue, Angular, Backstage) often haven't painted content when the `load` event fires. This can cause false positives like "missing heading" when the heading exists in the rendered DOM.
+
+Add a settle delay to wait for rendering:
+
+```yaml
+settle_ms: 4000  # Wait 4 seconds after load before scanning
+```
+
+**When to use:**
+- React/Vue/Angular applications
+- Backstage or other client-rendered dashboards
+- When getting false positives for elements that exist
+
+**Typical values:**
+- Fast SPAs: 2000ms (2 seconds)
+- Complex dashboards: 4000-5000ms (4-5 seconds)
+- Server-rendered sites: 0ms (no delay needed)
+
+### Click-Only Authentication
+
+For SSO logins, guest access, or "Continue as Guest" buttons where no credentials are needed:
+
+```yaml
+authentication:
+  login_url: https://example.com/login
+  submit_selector: button[data-guest-login]  # Just click, no credentials
+  success_indicator: .user-menu
+```
+
+**Use cases:**
+- SSO (Google, GitHub, SAML) - just click "Login with Google"
+- Guest/demo logins - "Continue as Guest" button
+- "Skip login" flows
+
+**How it works:**
+- If `username` and `password` are omitted, only the button is clicked
+- If credentials exist, they're filled first, then button is clicked
+- Fully backwards compatible with existing configs
 
 **Validate config before running:**
 
